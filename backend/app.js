@@ -11,14 +11,17 @@ dotenv.config();
 
 const app = express();
 
+
+//allow frontend to talk through backend
 app.use(cors({ 
     origin: process.env.CLIENT_URL, 
     credentials: true 
 }));
-app.use(express.json());
-app.use(cookieParser());
 
-// Routes
+app.use(express.json());   //reads JSON from request body
+app.use(cookieParser());   //reads cookies (for refresh token)
+
+// Routes (Connects all routes to the app.)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/verification', verificationRoutes);
