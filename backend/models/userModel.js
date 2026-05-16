@@ -27,3 +27,25 @@ export const findUserById = async (id) => {
     );
     return result.rows[0];
 };
+
+export const updateUserProfile = async (id, name, phone, profile_pic) => {
+    const result = await pool.query(
+        `UPDATE users 
+         SET name = $1, phone = $2, profile_pic = $3, updated_at = NOW()
+         WHERE id = $4
+         RETURNING id, name, email, phone, profile_pic, avg_rating, total_rides, is_admin, is_active, created_at`,
+        [name, phone, profile_pic, id]
+    );
+    return result.rows[0];
+};
+
+export const updateUserPassword = async (id, hashedPassword) => {
+    const result = await pool.query(
+        `UPDATE users 
+         SET password = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING id`,
+        [hashedPassword, id]
+    );
+    return result.rows[0];
+};
