@@ -241,3 +241,39 @@ export const logout = async (req, res) => {
         return res.status(500).json({ message: 'Server error' });
     }
 };
+
+
+
+export const googleAuthCallback = async (req, res) => {
+    try {
+        const user = req.user;
+
+        // 1. Generate tokens
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+
+        // 2. Store refresh token in sessions table
+        await pool.query(
+            `INSERT INTO sessions (user_id, refresh_token, expires_at)
+             VALUES ($1, $2, NOW() + INTERVAL '30 days')`,
+            [user.id, refreshToken]
+        );
+
+        // 3. Send refresh token in cookie
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+
+        // 4. Redirect to frontend with access token
+        res.redirect(
+            `${process.env.CLIENT_URL}/auth/success?token=${accessToken}`
+        );
+
+    } catch (err) {
+        console.error('Google callback error:', err.message);
+        res.redirect(`${process.env.CLIENT_URL}/auth/failed`);
+    }
+};
