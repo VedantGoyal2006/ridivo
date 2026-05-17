@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS rides (
     estimated_duration  INT,
     total_seats         INT NOT NULL CHECK (total_seats > 0),
     available_seats     INT NOT NULL CHECK (available_seats >= 0),
+    total_trip_cost     DECIMAL(10,2) NOT NULL,
     price_per_seat      DECIMAL(10,2) NOT NULL CHECK (price_per_seat > 0),
     description         TEXT,
     status              VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'FULL', 'ONGOING', 'COMPLETED', 'CANCELLED')),
