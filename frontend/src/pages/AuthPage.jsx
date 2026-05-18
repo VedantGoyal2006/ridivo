@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { loginUser, signupUser } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import RidivoLogo from '../components/RidivoLogo'
 
 const colors = {
   dark: "#093C5D",
@@ -228,13 +229,8 @@ export default function AuthPage() {
 
           {/* Logo */}
           <div style={{ position: "relative", zIndex: 2, padding: "40px 48px" }}>
-            <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-              <div style={{ width: "38px", height: "38px", backgroundColor: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.25)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "22px", fontWeight: "800", color: "white" }}>Ridivo</span>
+            <a href="/" style={{ textDecoration: "none" }}>
+              <RidivoLogo size={38} showText={true} textColor="white" />
             </a>
           </div>
 

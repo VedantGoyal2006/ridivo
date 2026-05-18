@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import RidivoLogo from '../components/RidivoLogo'
 
 const languages = [
   { code: "en", label: "English", native: "English" },
@@ -58,19 +59,8 @@ export default function Navbar() {
         }}>
 
           {/* Logo */}
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none", flexShrink: 0 }}>
-            <div style={{
-              width: "38px", height: "38px", backgroundColor: "#093C5D",
-              borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <span style={{
-              fontSize: "22px", fontWeight: "800", color: "#093C5D",
-              fontFamily: "'Sora', sans-serif", letterSpacing: "-0.3px",
-            }}>Ridivo</span>
+          <a href="/" style={{ textDecoration: "none" }}>
+            <RidivoLogo size={38} showText={true} textColor="#093C5D" />
           </a>
 
           {/* Desktop Nav Links */}
