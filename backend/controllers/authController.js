@@ -99,7 +99,14 @@ export const login = async (req, res) => {
             });
         }
 
-        // 4. Check password
+        // Check if user signed up with Google
+        if (!user.password) {
+            return res.status(400).json({ 
+                message: 'This email is registered with Google. Please use Continue with Google.' 
+            });
+        }
+
+        // Check password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ 

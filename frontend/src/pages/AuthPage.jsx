@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import { loginUser, signupUser } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import RidivoLogo from '../components/RidivoLogo'
 
 const colors = {
   dark: "#093C5D",
@@ -105,6 +109,11 @@ export default function AuthPage() {
   const [tab, setTab] = useState("login");
   const [loaded, setLoaded] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
@@ -131,15 +140,53 @@ export default function AuthPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    alert(`Login: ${loginEmail}`);
+    setError('');
+    setLoading(true);
+    try {
+      const data = await loginUser(loginEmail, loginPassword);
+      login(data.accessToken, data.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
-    alert(`Signup: ${name}, ${email}`);
+    setError('');
+    setLoading(true);
+    try {
+      const data = await signupUser(name, email, phone, password);
+      login(data.accessToken, data.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const ErrorMessage = () => error ? (
+    <div style={{
+      backgroundColor: '#FEE2E2',
+      border: '1px solid #FECACA',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      marginBottom: '16px',
+      color: '#DC2626',
+      fontSize: '13.5px',
+      fontFamily: "'DM Sans', sans-serif",
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+    }}>
+      ⚠️ {error}
+    </div>
+  ) : null;
 
   return (
     <>
@@ -180,16 +227,10 @@ export default function AuthPage() {
           <div style={{ position: "absolute", top: "-60px", left: "-60px", width: "300px", height: "300px", background: "radial-gradient(circle, rgba(59,117,151,0.3), transparent)", borderRadius: "50%", pointerEvents: "none" }} />
           <div style={{ position: "absolute", bottom: "-80px", right: "-40px", width: "350px", height: "350px", background: "radial-gradient(circle, rgba(59,117,151,0.2), transparent)", borderRadius: "50%", pointerEvents: "none" }} />
 
-          {/* Content */}
+          {/* Logo */}
           <div style={{ position: "relative", zIndex: 2, padding: "40px 48px" }}>
-            {/* Logo */}
-            <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
-              <div style={{ width: "38px", height: "38px", backgroundColor: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.25)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "22px", fontWeight: "800", color: "white" }}>Ridivo</span>
+            <a href="/" style={{ textDecoration: "none" }}>
+              <RidivoLogo size={38} showText={true} textColor="white" />
             </a>
           </div>
 
@@ -200,7 +241,6 @@ export default function AuthPage() {
               transform: loaded ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.8s cubic-bezier(0.16,1,0.3,1)",
             }}>
-              {/* Animated quote */}
               <div style={{ marginBottom: "48px" }}>
                 <h1 style={{
                   fontFamily: "'Sora', sans-serif",
@@ -216,7 +256,6 @@ export default function AuthPage() {
                 </p>
               </div>
 
-              {/* Feature list */}
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                 {features.map((f, i) => (
                   <div key={i} style={{
@@ -276,7 +315,7 @@ export default function AuthPage() {
               borderRadius: "14px", padding: "4px", marginBottom: "36px",
             }}>
               {["login", "signup"].map((t) => (
-                <button key={t} onClick={() => setTab(t)} style={{
+                <button key={t} onClick={() => { setTab(t); setError(''); }} style={{
                   flex: 1, padding: "10px", border: "none",
                   borderRadius: "10px", cursor: "pointer",
                   fontFamily: "'DM Sans', sans-serif",
@@ -324,29 +363,32 @@ export default function AuthPage() {
                     <a href="#" style={{ fontSize: "13px", color: colors.mid, fontWeight: "600", textDecoration: "none", fontFamily: "'DM Sans', sans-serif" }}>Forgot password?</a>
                   </div>
 
-                  <button type="submit" style={{
+                  <ErrorMessage />
+
+                  <button type="submit" disabled={loading} style={{
                     width: "100%", padding: "14px",
-                    backgroundColor: colors.dark, color: "white",
+                    backgroundColor: loading ? "#6B7280" : colors.dark, color: "white",
                     border: "none", borderRadius: "12px",
                     fontSize: "15px", fontWeight: "700",
-                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
                     transition: "all 0.25s ease",
                     boxShadow: "0 4px 16px rgba(9,60,93,0.3)",
                     marginBottom: "20px",
                   }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#0a4d78"; e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(9,60,93,0.35)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.dark; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(9,60,93,0.3)"; }}
-                  >Log In</button>
+                    onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.backgroundColor = "#0a4d78"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                    onMouseLeave={(e) => { if (!loading) { e.currentTarget.style.backgroundColor = colors.dark; e.currentTarget.style.transform = "translateY(0)"; } }}
+                  >
+                    {loading ? 'Logging in...' : 'Log In'}
+                  </button>
                 </form>
 
-                {/* Divider */}
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ flex: 1, height: "1px", backgroundColor: colors.border }} />
                   <span style={{ fontSize: "12px", color: colors.gray, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>or continue with</span>
                   <div style={{ flex: 1, height: "1px", backgroundColor: colors.border }} />
                 </div>
 
-                {/* Google */}
                 <button style={{
                   width: "100%", padding: "13px",
                   backgroundColor: "white", color: "#374151",
@@ -371,7 +413,7 @@ export default function AuthPage() {
 
                 <p style={{ textAlign: "center", fontSize: "13.5px", color: colors.gray, fontFamily: "'DM Sans', sans-serif" }}>
                   Don't have an account?{" "}
-                  <button onClick={() => setTab("signup")} style={{ background: "none", border: "none", color: colors.dark, fontWeight: "700", cursor: "pointer", fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif" }}>
+                  <button onClick={() => { setTab("signup"); setError(''); }} style={{ background: "none", border: "none", color: colors.dark, fontWeight: "700", cursor: "pointer", fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif" }}>
                     Sign Up
                   </button>
                 </p>
@@ -417,29 +459,32 @@ export default function AuthPage() {
                     icon={<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>}
                   />
 
-                  <button type="submit" style={{
+                  <ErrorMessage />
+
+                  <button type="submit" disabled={loading} style={{
                     width: "100%", padding: "14px",
-                    backgroundColor: colors.dark, color: "white",
+                    backgroundColor: loading ? "#6B7280" : colors.dark, color: "white",
                     border: "none", borderRadius: "12px",
                     fontSize: "15px", fontWeight: "700",
-                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
                     transition: "all 0.25s ease",
                     boxShadow: "0 4px 16px rgba(9,60,93,0.3)",
                     marginBottom: "20px", marginTop: "4px",
                   }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#0a4d78"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.dark; e.currentTarget.style.transform = "translateY(0)"; }}
-                  >Create Account</button>
+                    onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.backgroundColor = "#0a4d78"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                    onMouseLeave={(e) => { if (!loading) { e.currentTarget.style.backgroundColor = colors.dark; e.currentTarget.style.transform = "translateY(0)"; } }}
+                  >
+                    {loading ? 'Creating account...' : 'Create Account'}
+                  </button>
                 </form>
 
-                {/* Divider */}
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                   <div style={{ flex: 1, height: "1px", backgroundColor: colors.border }} />
                   <span style={{ fontSize: "12px", color: colors.gray, fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>or continue with</span>
                   <div style={{ flex: 1, height: "1px", backgroundColor: colors.border }} />
                 </div>
 
-                {/* Google */}
                 <button style={{
                   width: "100%", padding: "13px",
                   backgroundColor: "white", color: "#374151",
@@ -464,7 +509,7 @@ export default function AuthPage() {
 
                 <p style={{ textAlign: "center", fontSize: "13.5px", color: colors.gray, fontFamily: "'DM Sans', sans-serif" }}>
                   Already have an account?{" "}
-                  <button onClick={() => setTab("login")} style={{ background: "none", border: "none", color: colors.dark, fontWeight: "700", cursor: "pointer", fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif" }}>
+                  <button onClick={() => { setTab("login"); setError(''); }} style={{ background: "none", border: "none", color: colors.dark, fontWeight: "700", cursor: "pointer", fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif" }}>
                     Log In
                   </button>
                 </p>

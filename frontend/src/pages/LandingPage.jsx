@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import RidivoLogo from '../components/RidivoLogo'
 
 const colors = {
   dark: "#093C5D",
@@ -475,11 +476,8 @@ function Footer() {
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1.5fr", gap: "40px", marginBottom: "48px" }}>
           {/* Brand */}
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-              <div style={{ width: "36px", height: "36px", backgroundColor: colors.mid, borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11l19-9-9 19-2-8-8-2z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </div>
-              <span style={{ fontFamily: "'Sora',sans-serif", fontSize: "20px", fontWeight: "800", color: "white" }}>Ridivo</span>
+            <div style={{ marginBottom: "16px" }}>
+              <RidivoLogo size={36} showText={true} textColor="white" />
             </div>
             <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", color: "rgba(255,255,255,0.55)", lineHeight: "1.7", marginBottom: "24px", maxWidth: "220px" }}>Making travel affordable, social and sustainable.</p>
             <div style={{ display: "flex", gap: "12px" }}>
