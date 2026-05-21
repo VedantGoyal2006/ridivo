@@ -13,8 +13,9 @@ const languages = [
 ];
 
 const navLinks = [
-  { label: "Find a Ride", href: "#find" },
-  { label: "Offer a Ride", href: "#offer" },
+  { label: "Find a Ride", href: "/rides" },
+  { label: "Offer a Ride", href: "/rides" },
+  { label: "My Bookings", href: "/bookings" },
   { label: "How it Works", href: "#how" },
   { label: "Safety", href: "#safety" },
   { label: "About Us", href: "#about" },
