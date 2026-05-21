@@ -5,6 +5,7 @@ import Navbar from './components/Navbar'
 import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
+import ProfilePage from './pages/ProfilePage'
 
 function AuthSuccess() {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ function App() {
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
       </Routes>
     </BrowserRouter>

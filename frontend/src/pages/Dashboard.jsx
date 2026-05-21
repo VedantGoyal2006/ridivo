@@ -109,7 +109,7 @@ function Sidebar({ activePath, onNavigate, user }) {
 }
 
 // ── TOP NAVBAR ────────────────────────────────────────────────────────────────
-function TopNav({ user, notifications, onLogout }) {
+function TopNav({ user, notifications, onLogout, onNavigate }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const unread = notifications.filter(n => !n.read).length;
@@ -199,7 +199,8 @@ function TopNav({ user, notifications, onLogout }) {
 
         {/* Profile */}
         <div style={{ position: "relative" }}>
-          <button onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false); }} style={{
+          <button onClick={() => {setProfileOpen(!profileOpen); setNotifOpen(false); }} 
+          style={{
             display: "flex", alignItems: "center", gap: "10px",
             backgroundColor: "rgba(0,0,0,0.3)", border: `1px solid ${theme.glassBorder}`,
             borderRadius: "10px", padding: "6px 12px 6px 6px",
@@ -250,7 +251,9 @@ function TopNav({ user, notifications, onLogout }) {
                 { icon: "🛡️", label: "Become a Driver", path: "/verify" },
                 { icon: "⚙️", label: "Settings", path: "/settings" },
               ].map((item) => (
-                <button key={item.path} style={{
+                <button key={item.path} 
+                onClick={() => {onNavigate(item.path); navigate(item.path); setProfileOpen(false); }}
+                style={{
                   width: "100%", display: "flex", alignItems: "center", gap: "10px",
                   padding: "11px 16px", border: "none", backgroundColor: "transparent",
                   cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
@@ -577,6 +580,7 @@ export default function Dashboard() {
 
   const handleNavigate = (path) => {
     setActivePath(path);
+    navigate(path);
   };
 
   // The premium map/grid glowing background style
@@ -610,7 +614,7 @@ export default function Dashboard() {
         <div style={{ marginLeft: "240px", flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
           {/* Top navbar */}
-          <TopNav user={user} notifications={notifications} onLogout={handleLogout} />
+          <TopNav user={user} notifications={notifications} onLogout={handleLogout} onNavigate={navigate} />
 
           {/* Page content */}
           <main style={{
