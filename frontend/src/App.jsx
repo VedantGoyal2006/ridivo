@@ -6,6 +6,9 @@ import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
+import EditProfilePage from './pages/EditProfilePage'
+
+
 
 function AuthSuccess() {
   const navigate = useNavigate();
@@ -41,6 +44,7 @@ function App() {
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/edit-profile" element={<EditProfilePage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
       </Routes>
     </BrowserRouter>

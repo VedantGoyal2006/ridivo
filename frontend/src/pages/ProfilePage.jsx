@@ -345,7 +345,7 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 12, color: "#64748b" }}>({user.reviews.length} reviews)</span>
                   </div>
                   <div className="profile-actions">
-                    <button className="btn-primary" onClick={() => setEditOpen(true)}>✏️ Edit Profile</button>
+                    <button className="btn-primary" onClick={() => navigate('/edit-profile')}>✏️ Edit Profile</button>
 
                     {/* Dynamic verification button */}
                     {user.verification_status === null && (
