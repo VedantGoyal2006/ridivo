@@ -129,7 +129,7 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       try {
         const data = await getMyProfile();
-        //const vehicleRes = await axiosInstance.get("/vehicles");
+        const vehicleRes = await axiosInstance.get("/vehicles");
         setUser({
           name: data.user.name,
           email: data.user.email,
@@ -142,6 +142,7 @@ export default function ProfilePage() {
           created_at: data.user.created_at,
           profile_pic: data.user.profile_pic || null,
           verification_status: data.verification_status,
+          vehicles: vehicleRes.data.vehicles || [],
           reviews: [],
         });
       } catch (err) {
@@ -481,7 +482,7 @@ export default function ProfilePage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                   <div className="section-title" style={{ margin: 0 }}>My Vehicles</div>
                   <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 14px" }}
-                    onClick={() => navigate("/edit-profile")}>
+                    onClick={() => navigate("/add-vehicle")}>
                     + Add Vehicle
                   </button>
                 </div>
@@ -517,7 +518,7 @@ export default function ProfilePage() {
                     <div style={{ fontSize: "32px", marginBottom: "8px" }}>🚗</div>
                     <div style={{ fontSize: "13px", marginBottom: "12px" }}>No vehicles added yet</div>
                     <button className="btn-primary" style={{ fontSize: "12px", padding: "7px 16px" }}
-                      onClick={() => navigate("/edit-profile")}>
+                      onClick={() => navigate("/add-vehicle")}>
                       Add Your First Vehicle
                     </button>
                   </div>

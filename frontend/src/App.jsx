@@ -8,8 +8,8 @@ import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
 import VerificationPage from './pages/VerificationPage'
-
-
+import AdminPage from './pages/AdminPage'
+import AddVehiclePage from './pages/AddVehiclePage'
 
 function AuthSuccess() {
   const navigate = useNavigate();
@@ -20,9 +20,16 @@ function AuthSuccess() {
     const params = new URLSearchParams(location.search);
     const token = params.get('token');
     if (token) {
-      login(token, {});
+      // Decode token to get user info
+      const base64 = token.split('.')[1];
+      const decoded = JSON.parse(atob(base64));
+      login(token, { 
+        id: decoded.id, 
+        is_admin: decoded.is_admin 
+      });
       navigate('/dashboard');
-    } else {
+    }
+    else {
       navigate('/login');
     }
   }, []);
@@ -46,7 +53,9 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/edit-profile" element={<EditProfilePage />} />
+        <Route path="/add-vehicle" element={<AddVehiclePage />} />
         <Route path="/verify" element={<VerificationPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
       </Routes>
     </BrowserRouter>

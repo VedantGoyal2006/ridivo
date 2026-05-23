@@ -50,6 +50,7 @@ const navItems = [
   { icon: "⭐", label: "Reviews", path: "/reviews" },
   { icon: "👤", label: "Profile", path: "/profile" },
   { icon: "⚙️", label: "Settings", path: "/settings" },
+  { icon: "⚙️", label: "Admin Panel", path: "/admin" },
 ];
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
