@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyProfile, updateMyProfile } from "../services/userService";
+import axiosInstance from "../utils/axiosInstance";
 
 const avatarColors = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
 function getColor(str) {
@@ -128,6 +129,7 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       try {
         const data = await getMyProfile();
+        //const vehicleRes = await axiosInstance.get("/vehicles");
         setUser({
           name: data.user.name,
           email: data.user.email,
@@ -472,6 +474,55 @@ export default function ProfilePage() {
                   )}
                 </div>
               </>
+            )}
+            {/* Vehicles Section */}
+            {user.verification_status?.status === "APPROVED" && (
+              <div className="section-card">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div className="section-title" style={{ margin: 0 }}>My Vehicles</div>
+                  <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 14px" }}
+                    onClick={() => navigate("/edit-profile")}>
+                    + Add Vehicle
+                  </button>
+                </div>
+
+                {user.vehicles && user.vehicles.length > 0 ? (
+                  user.vehicles.map((v) => (
+                    <div key={v.id} style={{
+                      display: "flex", alignItems: "center", gap: "14px",
+                      padding: "14px", borderRadius: "10px", marginBottom: "10px",
+                      backgroundColor: "rgba(0,0,0,0.2)",
+                      border: `1px solid ${v.is_active ? "rgba(59,130,246,0.4)" : "#1e2535"}`,
+                    }}>
+                      <div style={{ fontSize: "28px" }}>
+                        {v.vehicle_type === "BIKE" ? "🏍️" : v.vehicle_type === "SUV" ? "🚙" : "🚗"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#e2e8f0", fontSize: "14px", fontWeight: "600", marginBottom: "3px" }}>
+                          {v.vehicle_name}
+                          {v.is_active && (
+                            <span style={{ marginLeft: "8px", fontSize: "10px", backgroundColor: "rgba(59,130,246,0.2)", color: "#3b82f6", padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ color: "#64748b", fontSize: "12px" }}>
+                          {v.vehicle_number} · {v.vehicle_type} · {v.total_seats} seats {v.color ? `· ${v.color}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: "center", padding: "24px 0", color: "#64748b" }}>
+                    <div style={{ fontSize: "32px", marginBottom: "8px" }}>🚗</div>
+                    <div style={{ fontSize: "13px", marginBottom: "12px" }}>No vehicles added yet</div>
+                    <button className="btn-primary" style={{ fontSize: "12px", padding: "7px 16px" }}
+                      onClick={() => navigate("/edit-profile")}>
+                      Add Your First Vehicle
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Tab: Reviews */}

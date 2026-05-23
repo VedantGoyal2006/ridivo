@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
+import VerificationPage from './pages/VerificationPage'
 
 
 
@@ -45,6 +46,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/edit-profile" element={<EditProfilePage />} />
+        <Route path="/verify" element={<VerificationPage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
       </Routes>
     </BrowserRouter>
