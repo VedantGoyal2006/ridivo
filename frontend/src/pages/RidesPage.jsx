@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,10 @@ import {
 
 export default function RidesPage() {
     const { user } = useAuth();
+    const location = useLocation();
+const params = new URLSearchParams(location.search);
+const defaultTab = params.get('tab') || 'search';
+const [activeTab, setActiveTab] = useState(defaultTab);
 
     // Search state
     const [searchForm, setSearchForm] = useState({
@@ -127,11 +132,50 @@ export default function RidesPage() {
     return (
         <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
             <h1>Rides</h1>
+<div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+    <button
+        onClick={() => setActiveTab('search')}
+        style={{
+            padding: '10px 20px',
+            background: activeTab === 'search' ? '#093C5D' : '#f5f5f5',
+            color: activeTab === 'search' ? 'white' : 'black',
+            border: 'none', borderRadius: '8px', cursor: 'pointer',
+            fontWeight: '600'
+        }}
+    >
+        🔍 Find a Ride
+    </button>
+    <button
+        onClick={() => setActiveTab('post')}
+        style={{
+            padding: '10px 20px',
+            background: activeTab === 'post' ? '#093C5D' : '#f5f5f5',
+            color: activeTab === 'post' ? 'white' : 'black',
+            border: 'none', borderRadius: '8px', cursor: 'pointer',
+            fontWeight: '600'
+        }}
+    >
+        🚗 Offer a Ride
+    </button>
+    <button
+        onClick={() => setActiveTab('my')}
+        style={{
+            padding: '10px 20px',
+            background: activeTab === 'my' ? '#093C5D' : '#f5f5f5',
+            color: activeTab === 'my' ? 'white' : 'black',
+            border: 'none', borderRadius: '8px', cursor: 'pointer',
+            fontWeight: '600'
+        }}
+    >
+        📋 My Rides
+    </button>
+</div>
 
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {success && <p style={{ color: 'green' }}>{success}</p>}
 
             {/* Search Section */}
+            {activeTab === 'search' && (
             <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
                 <h2>Search Rides</h2>
                 <form onSubmit={handleSearch}>
@@ -174,7 +218,7 @@ export default function RidesPage() {
                     </button>
                 </form>
             </div>
-
+            )}
             {/* Search Results */}
             {searchResults.length > 0 && (
                 <div style={{ marginBottom: '20px' }}>
@@ -201,7 +245,7 @@ export default function RidesPage() {
             )}
 
             {/* Post Ride Section */}
-            {user && (
+           {activeTab === 'post' && user && (
                 <div style={{ marginBottom: '20px' }}>
                     <button
                         onClick={() => setShowPostForm(!showPostForm)}
@@ -281,7 +325,7 @@ export default function RidesPage() {
             )}
 
             {/* My Rides Section */}
-            {user && myRides.length > 0 && (
+            {activeTab === 'my' && user && (
                 <div>
                     <h2>My Posted Rides</h2>
                     {myRides.map((ride) => (

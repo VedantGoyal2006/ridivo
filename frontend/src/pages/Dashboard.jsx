@@ -33,8 +33,8 @@ const notifications = [
 const navItems = [
   { icon: "⊞", label: "Dashboard", path: "/dashboard" },
   { icon: "🔍", label: "Find a Ride", path: "/rides" },
-  { icon: "🚗", label: "My Rides", path: "/rides" },
-  { icon: "➕", label: "Offer a Ride", path: "/rides" },
+  { icon: "➕", label: "Offer a Ride", path: "/rides?tab=post" },
+{ icon: "🚗", label: "My Rides", path: "/rides?tab=my" },
   { icon: "📋", label: "Bookings", path: "/bookings" },
   { icon: "💰", label: "Payments", path: "/payments" },
   { icon: "⭐", label: "Reviews", path: "/reviews" },
@@ -60,7 +60,7 @@ function Sidebar({ activePath, onNavigate, user }) {
 
       <nav style={{ padding: "16px 12px", flex: 1 }}>
         {navItems.map((item) => (
-          <button key={item.path} onClick={() => onNavigate(item.path)}
+          <button key={item.label} onClick={() => onNavigate(item.path)}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: "12px",
               padding: "11px 12px", borderRadius: "10px", border: "none",
@@ -601,17 +601,25 @@ export default function Dashboard() {
 const fetchDashboardData = async () => {
     try {
         const bookingsData = await getMyBookings();
-        const ridesData = await getMyRides();
-
         setMyBookings(bookingsData.bookings);
-        setMyRides(ridesData.rides);
-
-        setStats({
+        setStats(prev => ({
+            ...prev,
             ridesTaken: bookingsData.bookings.length,
-            ridesOffered: ridesData.rides.length,
-        });
+        }));
     } catch (err) {
-        console.error('Failed to fetch dashboard data');
+        console.error('Failed to fetch bookings');
+    }
+
+    try {
+        const ridesData = await getMyRides();
+        setMyRides(ridesData.rides);
+        setStats(prev => ({
+            ...prev,
+            ridesOffered: ridesData.rides.length,
+        }));
+    } catch (err) {
+        // User might not be a driver, that's okay
+        console.log('User is not a driver');
     }
 };
 
