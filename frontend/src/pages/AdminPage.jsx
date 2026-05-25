@@ -31,11 +31,11 @@ export default function AdminPage() {
   const [actionLoading, setActionLoading] = useState(null);
   const [alert, setAlert] = useState({ type: "", message: "" });
 
-  // useEffect(() => {
-//   if (user && !user.is_admin) {
-//     navigate("/dashboard");
-//   }
-// }, [user]);
+   useEffect(() => {
+    if (user && !user.is_admin) {
+      navigate("/dashboard");
+    }
+  }, [user]);
 
   useEffect(() => {
     fetchData();

@@ -50,7 +50,6 @@ const navItems = [
   { icon: "⭐", label: "Reviews", path: "/reviews" },
   { icon: "👤", label: "Profile", path: "/profile" },
   { icon: "⚙️", label: "Settings", path: "/settings" },
-  { icon: "⚙️", label: "Admin Panel", path: "/admin" },
 ];
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -89,6 +88,27 @@ function Sidebar({ activePath, onNavigate, user }) {
             {item.label}
           </button>
         ))}
+
+        {/* Admin only button */}
+        {user?.is_admin && (
+          <button onClick={() => onNavigate("/admin")}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", gap: "12px",
+              padding: "11px 12px", borderRadius: "10px", border: "none",
+              backgroundColor: activePath === "/admin" ? "rgba(251,191,36,0.15)" : "transparent",
+              color: activePath === "/admin" ? "#FBBF24" : "#94A3B8",
+              cursor: "pointer", fontSize: "14px", fontWeight: "600",
+              fontFamily: "'DM Sans', sans-serif", textAlign: "left",
+              transition: "all 0.2s ease", marginBottom: "2px",
+              borderLeft: activePath === "/admin" ? "3px solid #FBBF24" : "3px solid transparent",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(251,191,36,0.1)"; e.currentTarget.style.color = "#FBBF24"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = activePath === "/admin" ? "rgba(251,191,36,0.15)" : "transparent"; e.currentTarget.style.color = activePath === "/admin" ? "#FBBF24" : "#94A3B8"; }}
+          >
+            <span style={{ fontSize: "16px", width: "20px", textAlign: "center" }}>⚙️</span>
+            Admin Panel
+          </button>
+        )}
       </nav>
 
       <div style={{ margin: "12px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(2,132,199,0.4))", backdropFilter: "blur(10px)", border: `1px solid rgba(56,189,248,0.3)`, padding: "16px", marginBottom: "20px" }}>

@@ -19,10 +19,19 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = (token, userData) => {
+        // Decode token to always get fresh is_admin value
+        const base64 = token.split('.')[1];
+        const decoded = JSON.parse(atob(base64));
+        
+        const enrichedUser = {
+            ...userData,
+            is_admin: decoded.is_admin === true || decoded.is_admin === 'true',
+        };
+        
         localStorage.setItem('accessToken', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user', JSON.stringify(enrichedUser));
         setAccessToken(token);
-        setUser(userData);
+        setUser(enrichedUser);
     };
 
     const logout = () => {
