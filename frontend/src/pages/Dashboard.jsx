@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import RidivoLogo from "../components/RidivoLogo";
+import { getMyBookings, getMyRides } from '../services/rideService';
 
 // ── NEW THEME: PREMIUM DARK GLASSMORPHISM ─────────────────────────────────────
 const theme = {
@@ -21,17 +22,6 @@ const theme = {
 };
 
 // ── DUMMY DATA (UNCHANGED) ────────────────────────────────────────────────────
-const upcomingRides = [
-  { id: 1, from: "Bhopal", to: "Indore", date: "20 May", day: "Tue", time: "08:30 AM", driver: "Rahul Sharma", rating: 4.8, reviews: 32, vehicle: "Swift Dzire", plate: "MP09AB1234", price: 320, seats: 2, status: "CONFIRMED", avatar: "#F59E0B", initials: "RS" },
-  { id: 2, from: "Indore", to: "Ujjain", date: "24 May", day: "Sat", time: "07:00 AM", driver: "Aman Verma", rating: 4.6, reviews: 18, vehicle: "Honda City", plate: "MP09CD5678", price: 180, seats: 1, status: "PENDING", avatar: "#10B981", initials: "AV" },
-];
-
-const recentActivity = [
-  { id: 1, type: "ride_taken", text: "Bhopal → Indore", date: "15 May", amount: "₹320", status: "Completed", color: "#34D399" },
-  { id: 2, type: "ride_offered", text: "Indore → Bhopal", date: "12 May", amount: "₹640", status: "Completed", color: "#38BDF8" },
-  { id: 3, type: "ride_taken", text: "Bhopal → Jabalpur", date: "8 May", amount: "₹450", status: "Completed", color: "#34D399" },
-  { id: 4, type: "ride_offered", text: "Ujjain → Indore", date: "3 May", amount: "₹380", status: "Completed", color: "#38BDF8" },
-];
 
 const notifications = [
   { id: 1, text: "Rahul accepted your booking request", time: "2 min ago", read: false, icon: "✅" },
@@ -41,10 +31,10 @@ const notifications = [
 ];
 
 const navItems = [
-  { icon: "⊞", label: "Dashboard", path: "/dashboard", active: true },
-  { icon: "🔍", label: "Find a Ride", path: "/find-ride" },
-  { icon: "🚗", label: "My Rides", path: "/my-rides" },
-  { icon: "➕", label: "Offer a Ride", path: "/offer-ride" },
+  { icon: "⊞", label: "Dashboard", path: "/dashboard" },
+  { icon: "🔍", label: "Find a Ride", path: "/rides" },
+  { icon: "➕", label: "Offer a Ride", path: "/rides?tab=post" },
+{ icon: "🚗", label: "My Rides", path: "/rides?tab=my" },
   { icon: "📋", label: "Bookings", path: "/bookings" },
   { icon: "💰", label: "Payments", path: "/payments" },
   { icon: "⭐", label: "Reviews", path: "/reviews" },
@@ -70,7 +60,7 @@ function Sidebar({ activePath, onNavigate, user }) {
 
       <nav style={{ padding: "16px 12px", flex: 1 }}>
         {navItems.map((item) => (
-          <button key={item.path} onClick={() => onNavigate(item.path)}
+          <button key={item.label} onClick={() => onNavigate(item.path)}
             style={{
               width: "100%", display: "flex", alignItems: "center", gap: "12px",
               padding: "11px 12px", borderRadius: "10px", border: "none",
@@ -411,60 +401,75 @@ function SearchSection() {
 }
 
 // ── UPCOMING RIDES ────────────────────────────────────────────────────────────
-function UpcomingRides() {
+function UpcomingRides({ bookings }) {
+  const upcoming = bookings.filter(b => 
+    ['PENDING', 'CONFIRMED'].includes(b.status)
+  );
+
   return (
     <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, overflow: "hidden", marginBottom: "24px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
       <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>Upcoming Rides</div>
         <button style={{ background: "none", border: "none", color: theme.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View all →</button>
       </div>
-      {upcomingRides.map((ride, i) => (
-        <div key={ride.id} style={{
+
+      {upcoming.length === 0 ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
+          No upcoming rides
+        </div>
+      ) : upcoming.map((booking, i) => (
+        <div key={booking.id} style={{
           padding: "20px 24px", display: "grid",
           gridTemplateColumns: "60px 1fr 1fr auto",
           gap: "16px", alignItems: "center",
-          borderBottom: i < upcomingRides.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
+          borderBottom: i < upcoming.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
           transition: "background 0.2s",
         }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
           <div style={{ textAlign: "center", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "12px", padding: "10px 8px", border: `1px solid ${theme.glassBorder}` }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "22px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>{ride.date.split(' ')[0]}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.accent, fontWeight: "600" }}>{ride.date.split(' ')[1]}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: theme.textSecondary }}>{ride.day}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "22px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>
+              {new Date(booking.departure_time).getDate()}
+            </div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.accent, fontWeight: "600" }}>
+              {new Date(booking.departure_time).toLocaleString('default', { month: 'short' })}
+            </div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: theme.textSecondary }}>
+              {new Date(booking.departure_time).toLocaleString('default', { weekday: 'short' })}
+            </div>
           </div>
 
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{ride.from}</span>
+              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{booking.origin}</span>
               <span style={{ color: theme.textSecondary, fontSize: "14px" }}>→</span>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{ride.to}</span>
+              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{booking.destination}</span>
             </div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>
-              {ride.time} · {ride.seats} seat{ride.seats > 1 ? "s" : ""} booked
+              {new Date(booking.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {booking.seats_booked} seat{booking.seats_booked > 1 ? "s" : ""} booked
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: ride.avatar, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.3)" }}>
-              {ride.initials}
+            <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "#F59E0B", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.3)" }}>
+              {booking.driver_name?.[0] || 'D'}
             </div>
             <div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{ride.driver}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>⭐ {ride.rating} · {ride.vehicle}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{booking.driver_name}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>⭐ {booking.avg_rating} · {booking.vehicle_name}</div>
             </div>
           </div>
 
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: theme.textPrimary, marginBottom: "6px" }}>₹{ride.price}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: theme.textPrimary, marginBottom: "6px" }}>₹{booking.total_fare}</div>
             <div style={{
               display: "inline-block", padding: "3px 10px", borderRadius: "100px",
-              backgroundColor: ride.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
-              color: ride.status === "CONFIRMED" ? theme.successText : theme.warningText,
+              backgroundColor: booking.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
+              color: booking.status === "CONFIRMED" ? theme.successText : theme.warningText,
               fontSize: "11px", fontWeight: "600", fontFamily: "'DM Sans', sans-serif",
-              border: `1px solid ${ride.status === "CONFIRMED" ? theme.successText : theme.warningText}`
-            }}>{ride.status}</div>
+              border: `1px solid ${booking.status === "CONFIRMED" ? theme.successText : theme.warningText}`
+            }}>{booking.status}</div>
           </div>
         </div>
       ))}
@@ -473,32 +478,43 @@ function UpcomingRides() {
 }
 
 // ── RECENT ACTIVITY ───────────────────────────────────────────────────────────
-function RecentActivity() {
+function RecentActivity({ bookings }) {
+  const recent = bookings.slice(0, 4);
+
   return (
     <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
       <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>Recent Activity</div>
         <button style={{ background: "none", border: "none", color: theme.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View all →</button>
       </div>
-      {recentActivity.map((a, i) => (
-        <div key={a.id} style={{
+
+      {recent.length === 0 ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
+          No recent activity
+        </div>
+      ) : recent.map((booking, i) => (
+        <div key={booking.id} style={{
           padding: "14px 24px", display: "flex", alignItems: "center", gap: "14px",
-          borderBottom: i < recentActivity.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
+          borderBottom: i < recent.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
           transition: "background 0.2s",
         }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
           <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "rgba(255,255,255,0.05)", border: `1px solid ${theme.glassBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>
-            {a.type === "ride_taken" ? "🧳" : "🚗"}
+            🧳
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>{a.text}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>{a.date} · {a.type === "ride_taken" ? "Ride taken" : "Ride offered"}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>
+              {booking.origin} → {booking.destination}
+            </div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>
+              {new Date(booking.created_at).toLocaleDateString()} · Ride taken
+            </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: a.color }}>{a.amount}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.successText }}>{a.status}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: "#34D399" }}>₹{booking.total_fare}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.successText }}>{booking.status}</div>
           </div>
         </div>
       ))}
@@ -507,7 +523,7 @@ function RecentActivity() {
 }
 
 // ── RIGHT PANEL ───────────────────────────────────────────────────────────────
-function RightPanel({ user }) {
+function RightPanel({ user, navigate }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Profile card */}
@@ -545,13 +561,13 @@ function RightPanel({ user }) {
       <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, padding: "20px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary, marginBottom: "16px" }}>Quick Actions</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-          {[
-            { icon: "🔍", label: "Find Ride", bg: "rgba(56, 189, 248, 0.1)", border: "rgba(56, 189, 248, 0.3)", textColor: "#38BDF8" },
-            { icon: "🚗", label: "Offer Ride", bg: "rgba(52, 211, 153, 0.1)", border: "rgba(52, 211, 153, 0.3)", textColor: "#34D399" },
-            { icon: "📋", label: "Bookings", bg: "rgba(251, 191, 36, 0.1)", border: "rgba(251, 191, 36, 0.3)", textColor: "#FBBF24" },
-            { icon: "🛡️", label: "Verify", bg: "rgba(167, 139, 250, 0.1)", border: "rgba(167, 139, 250, 0.3)", textColor: "#A78BFA" },
-          ].map((action) => (
-            <button key={action.label} style={{
+        {[
+    { icon: "🔍", label: "Find Ride", bg: "rgba(56, 189, 248, 0.1)", border: "rgba(56, 189, 248, 0.3)", textColor: "#38BDF8", path: "/rides" },
+    { icon: "🚗", label: "Offer Ride", bg: "rgba(52, 211, 153, 0.1)", border: "rgba(52, 211, 153, 0.3)", textColor: "#34D399", path: "/rides" },
+    { icon: "📋", label: "Bookings", bg: "rgba(251, 191, 36, 0.1)", border: "rgba(251, 191, 36, 0.3)", textColor: "#FBBF24", path: "/bookings" },
+    { icon: "🛡️", label: "Verify", bg: "rgba(167, 139, 250, 0.1)", border: "rgba(167, 139, 250, 0.3)", textColor: "#A78BFA", path: "/profile" },
+].map((action) => (
+    <button key={action.label} onClick={() => navigate(action.path)} style={{
               padding: "14px 10px", borderRadius: "12px", border: `1px solid ${action.border}`,
               backgroundColor: action.bg, cursor: "pointer",
               display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
@@ -589,10 +605,44 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [activePath, setActivePath] = useState("/dashboard");
   const [loaded, setLoaded] = useState(false);
+  const [myBookings, setMyBookings] = useState([]);
+  const [myRides, setMyRides] = useState([]);
+  const [stats, setStats] = useState({
+    ridesTaken: 0,
+    ridesOffered: 0,
+  });
 
-  useEffect(() => {
+ useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
-  }, []);
+    if (user) {
+        fetchDashboardData();
+    }
+}, [user]);
+
+const fetchDashboardData = async () => {
+    try {
+        const bookingsData = await getMyBookings();
+        setMyBookings(bookingsData.bookings);
+        setStats(prev => ({
+            ...prev,
+            ridesTaken: bookingsData.bookings.length,
+        }));
+    } catch (err) {
+        console.error('Failed to fetch bookings');
+    }
+
+    try {
+        const ridesData = await getMyRides();
+        setMyRides(ridesData.rides);
+        setStats(prev => ({
+            ...prev,
+            ridesOffered: ridesData.rides.length,
+        }));
+    } catch (err) {
+        // User might not be a driver, that's okay
+        console.log('User is not a driver');
+    }
+};
 
   const handleLogout = async () => {
     logout();
@@ -648,8 +698,8 @@ export default function Dashboard() {
 
             {/* Stats row */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "28px" }}>
-              <StatCard icon="🧳" label="Rides Taken" value="12" sub="↑ 3 this month" color={theme.accent} bg="rgba(56, 189, 248, 0.15)" />
-              <StatCard icon="🚗" label="Rides Offered" value="3" sub="↑ 1 this month" color={theme.successText} bg="rgba(52, 211, 153, 0.15)" />
+              <StatCard icon="🧳" label="Rides Taken" value={stats.ridesTaken} sub="Total bookings" color={theme.accent} bg="rgba(56, 189, 248, 0.15)" />
+              <StatCard icon="🚗" label="Rides Offered" value={stats.ridesOffered} sub="Total rides posted" color={theme.successText} bg="rgba(52, 211, 153, 0.15)" />
               <StatCard icon="💰" label="Total Saved" value="₹2,450" sub="vs solo travel" color={theme.warningText} bg="rgba(251, 191, 36, 0.15)" />
               <StatCard icon="⭐" label="Avg Rating" value="4.8" sub="From 12 reviews" color="#A78BFA" bg="rgba(167, 139, 250, 0.15)" />
             </div>
@@ -660,10 +710,11 @@ export default function Dashboard() {
             {/* Bottom grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "24px" }}>
               <div>
-                <UpcomingRides />
-                <RecentActivity />
+                <UpcomingRides bookings={myBookings} />
+                <RecentActivity bookings={myBookings} />
+                
               </div>
-              <RightPanel user={user} />
+             <RightPanel user={user} navigate={navigate} />
             </div>
           </main>
         </div>

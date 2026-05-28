@@ -10,6 +10,8 @@ import ProfilePage from './pages/ProfilePage'
 import EditProfilePage from './pages/EditProfilePage'
 import VerificationPage from './pages/VerificationPage'
 import AdminPage from './pages/AdminPage'
+import RidesPage from './pages/RidesPage'
+import BookingsPage from './pages/BookingsPage'
 
 function AuthSuccess() {
   const navigate = useNavigate();
@@ -46,7 +48,7 @@ function App() {
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
-        <Route path="/auth/success" element={<AuthSuccess />} />
+<Route path="/auth/success" element={<AuthSuccess />} />
 
         {/* Protected routes */}
         <Route path="/dashboard" element={
@@ -60,6 +62,12 @@ function App() {
         } />
         <Route path="/verify" element={
           <ProtectedRoute><VerificationPage /></ProtectedRoute>
+        } />
+        <Route path="/rides" element={
+          <ProtectedRoute><RidesPage /></ProtectedRoute>
+        } />
+        <Route path="/bookings" element={
+          <ProtectedRoute><BookingsPage /></ProtectedRoute>
         } />
 
         {/* Admin only route */}
