@@ -105,7 +105,7 @@ export const searchRides = async (req, res) => {
 // GET /api/rides/my-rides
 export const getMyRides = async (req, res) => {
     try {
-        const rides = await getMyRidesInDB(req.user.id);
+        const rides = await getMyRidesFromDB(req.user.id);
 
         return res.status(200).json({
             message: 'Rides fetched successfully',

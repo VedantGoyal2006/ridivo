@@ -123,8 +123,8 @@ export default function RidesPage() {
                 departure_time: '', total_seats: '',
                 total_trip_cost: '', description: ''
             });
-            fetchMyRides();
-            setTimeout(() => setActiveTab('my'), 1500);
+           await fetchMyRides();
+setActiveTab('my');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to post ride');
         }
