@@ -54,7 +54,8 @@ export default function RidesPage() {
     const [postForm, setPostForm] = useState({
         vehicle_id: '', origin: '', destination: '',
         departure_time: '', total_seats: '',
-        total_trip_cost: '', description: ''
+        total_trip_cost: '', description: '',
+        waypoints: []
     });
     const [posting, setPosting] = useState(false);
 
@@ -116,15 +117,28 @@ export default function RidesPage() {
         setSuccess('');
         setPosting(true);
         try {
-            await createRide(postForm);
+            const rideData = { ...postForm };
+            const response = await createRide(rideData);
+
+            // If waypoints exist, add them
+            if (postForm.waypoints && postForm.waypoints.length > 0) {
+                const validWaypoints = postForm.waypoints.filter(wp => wp.location_name.trim() !== '');
+                if (validWaypoints.length > 0) {
+                    await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, {
+                        waypoints: validWaypoints
+                    });
+                }
+            }
+
             setSuccess('Ride posted successfully!');
             setPostForm({
                 vehicle_id: '', origin: '', destination: '',
                 departure_time: '', total_seats: '',
-                total_trip_cost: '', description: ''
+                total_trip_cost: '', description: '',
+                waypoints: []
             });
-           await fetchMyRides();
-setActiveTab('my');
+            await fetchMyRides();
+            setActiveTab('my');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to post ride');
         }
@@ -142,6 +156,26 @@ setActiveTab('my');
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to book ride');
         }
+    };
+
+    const addWaypoint = () => {
+        setPostForm({
+            ...postForm,
+            waypoints: [...postForm.waypoints, { location_name: '', lat: null, lng: null }]
+        });
+    };
+
+    const removeWaypoint = (index) => {
+        setPostForm({
+            ...postForm,
+            waypoints: postForm.waypoints.filter((_, i) => i !== index)
+        });
+    };
+
+    const updateWaypoint = (index, value) => {
+        const newWaypoints = [...postForm.waypoints];
+        newWaypoints[index].location_name = value;
+        setPostForm({ ...postForm, waypoints: newWaypoints });
     };
 
     const inputStyle = {
@@ -204,58 +238,25 @@ setActiveTab('my');
                         border: `1px solid rgba(56,189,248,0.3)`,
                         boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                     }}>
-                        {/* Decorative circles */}
-                        <div style={{
-                            position: 'absolute', top: '-40px', right: '-40px',
-                            width: '200px', height: '200px',
-                            background: 'radial-gradient(circle, rgba(56,189,248,0.2), transparent)',
-                            borderRadius: '50%',
-                        }} />
-                        <div style={{
-                            position: 'absolute', bottom: '-60px', left: '30%',
-                            width: '250px', height: '250px',
-                            background: 'radial-gradient(circle, rgba(56,189,248,0.1), transparent)',
-                            borderRadius: '50%',
-                        }} />
+                        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(56,189,248,0.2), transparent)', borderRadius: '50%' }} />
+                        <div style={{ position: 'absolute', bottom: '-60px', left: '30%', width: '250px', height: '250px', background: 'radial-gradient(circle, rgba(56,189,248,0.1), transparent)', borderRadius: '50%' }} />
 
                         <div style={{ position: 'relative', zIndex: 1 }}>
-                            <h1 style={{
-                                fontFamily: "'Sora', sans-serif",
-                                fontSize: '32px', fontWeight: '800',
-                                color: theme.textPrimary, margin: '0 0 8px',
-                            }}>
+                            <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: '32px', fontWeight: '800', color: theme.textPrimary, margin: '0 0 8px' }}>
                                 🚗 Find Your Perfect Ride
                             </h1>
-                            <p style={{
-                                color: 'rgba(255,255,255,0.7)',
-                                fontSize: '15px', margin: '0 0 24px',
-                            }}>
+                            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', margin: '0 0 24px' }}>
                                 Share rides, split costs, travel smarter
                             </p>
-
                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                                 {[
                                     { value: '10K+', label: 'Happy Travelers' },
                                     { value: '5K+', label: 'Rides Shared' },
                                     { value: '4.8★', label: 'Avg Rating' },
                                 ].map((stat) => (
-                                    <div key={stat.label} style={{
-                                        backgroundColor: 'rgba(255,255,255,0.1)',
-                                        backdropFilter: 'blur(10px)',
-                                        border: '1px solid rgba(255,255,255,0.2)',
-                                        borderRadius: '12px',
-                                        padding: '12px 20px',
-                                        textAlign: 'center',
-                                    }}>
-                                        <div style={{
-                                            fontFamily: "'Sora', sans-serif",
-                                            fontSize: '20px', fontWeight: '800',
-                                            color: theme.textPrimary,
-                                        }}>{stat.value}</div>
-                                        <div style={{
-                                            fontSize: '12px',
-                                            color: 'rgba(255,255,255,0.6)',
-                                        }}>{stat.label}</div>
+                                    <div key={stat.label} style={{ backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px', padding: '12px 20px', textAlign: 'center' }}>
+                                        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '20px', fontWeight: '800', color: theme.textPrimary }}>{stat.value}</div>
+                                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{stat.label}</div>
                                     </div>
                                 ))}
                             </div>
@@ -263,15 +264,7 @@ setActiveTab('my');
                     </div>
 
                     {/* Tab Buttons */}
-                    <div style={{
-                        display: 'flex', gap: '6px',
-                        marginBottom: '24px',
-                        backgroundColor: theme.glassCard,
-                        padding: '6px', borderRadius: '14px',
-                        border: `1px solid ${theme.glassBorder}`,
-                        width: 'fit-content',
-                        backdropFilter: 'blur(10px)',
-                    }}>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', backgroundColor: theme.glassCard, padding: '6px', borderRadius: '14px', border: `1px solid ${theme.glassBorder}`, width: 'fit-content', backdropFilter: 'blur(10px)' }}>
                         {[
                             { id: 'search', label: '🔍 Find a Ride' },
                             { id: 'post', label: '🚗 Offer a Ride' },
@@ -281,13 +274,8 @@ setActiveTab('my');
                                 key={tab.id}
                                 onClick={() => { setActiveTab(tab.id); setError(''); setSuccess(''); }}
                                 style={{
-                                    padding: '9px 20px',
-                                    border: 'none',
-                                    borderRadius: '10px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    fontFamily: "'DM Sans', sans-serif",
+                                    padding: '9px 20px', border: 'none', borderRadius: '10px', cursor: 'pointer',
+                                    fontSize: '14px', fontWeight: '600', fontFamily: "'DM Sans', sans-serif",
                                     transition: 'all 0.2s ease',
                                     backgroundColor: activeTab === tab.id ? 'rgba(56,189,248,0.2)' : 'transparent',
                                     color: activeTab === tab.id ? theme.accent : theme.textSecondary,
@@ -302,103 +290,41 @@ setActiveTab('my');
 
                     {/* Messages */}
                     {error && (
-                        <div style={{
-                            backgroundColor: theme.dangerBg,
-                            border: `1px solid rgba(239,68,68,0.3)`,
-                            borderRadius: '10px', padding: '12px 16px',
-                            marginBottom: '20px', color: theme.danger,
-                            fontSize: '13.5px', display: 'flex',
-                            alignItems: 'center', gap: '8px',
-                        }}>
+                        <div style={{ backgroundColor: theme.dangerBg, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', color: theme.danger, fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             ⚠️ {error}
                         </div>
                     )}
                     {success && (
-                        <div style={{
-                            backgroundColor: theme.successBg,
-                            border: `1px solid rgba(52,211,153,0.3)`,
-                            borderRadius: '10px', padding: '12px 16px',
-                            marginBottom: '20px', color: theme.success,
-                            fontSize: '13.5px', display: 'flex',
-                            alignItems: 'center', gap: '8px',
-                        }}>
+                        <div style={{ backgroundColor: theme.successBg, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', color: theme.success, fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             ✅ {success}
                         </div>
                     )}
 
-                    {/* Search Tab */}
+                    {/* ── SEARCH TAB ── */}
                     {activeTab === 'search' && (
                         <div>
-                            <div style={{
-                                backgroundColor: theme.glassCard,
-                                backdropFilter: 'blur(16px)',
-                                borderRadius: '20px',
-                                border: `1px solid ${theme.glassBorder}`,
-                                padding: '28px',
-                                marginBottom: '24px',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                            }}>
-                                <h2 style={{
-                                    fontFamily: "'Sora', sans-serif",
-                                    fontSize: '18px', fontWeight: '700',
-                                    color: theme.textPrimary, margin: '0 0 20px',
-                                }}>Search for a Ride</h2>
-
+                            <div style={{ backgroundColor: theme.glassCard, backdropFilter: 'blur(16px)', borderRadius: '20px', border: `1px solid ${theme.glassBorder}`, padding: '28px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+                                <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 20px' }}>Search for a Ride</h2>
                                 <form onSubmit={handleSearch}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                         <div>
                                             <label style={labelStyle}>From</label>
-                                            <input
-                                                placeholder="e.g. Indore"
-                                                value={searchForm.origin}
-                                                onChange={(e) => setSearchForm({ ...searchForm, origin: e.target.value })}
-                                                required style={inputStyle}
-                                            />
+                                            <input placeholder="e.g. Indore" value={searchForm.origin} onChange={(e) => setSearchForm({ ...searchForm, origin: e.target.value })} required style={inputStyle} />
                                         </div>
                                         <div>
                                             <label style={labelStyle}>To</label>
-                                            <input
-                                                placeholder="e.g. Bhopal"
-                                                value={searchForm.destination}
-                                                onChange={(e) => setSearchForm({ ...searchForm, destination: e.target.value })}
-                                                required style={inputStyle}
-                                            />
+                                            <input placeholder="e.g. Bhopal" value={searchForm.destination} onChange={(e) => setSearchForm({ ...searchForm, destination: e.target.value })} required style={inputStyle} />
                                         </div>
                                         <div>
                                             <label style={labelStyle}>Date</label>
-                                            <input
-                                                type="date"
-                                                value={searchForm.date}
-                                                onChange={(e) => setSearchForm({ ...searchForm, date: e.target.value })}
-                                                required style={inputStyle}
-                                            />
+                                            <input type="date" value={searchForm.date} onChange={(e) => setSearchForm({ ...searchForm, date: e.target.value })} required style={inputStyle} />
                                         </div>
                                         <div>
                                             <label style={labelStyle}>Seats Needed</label>
-                                            <input
-                                                type="number" min="1"
-                                                value={searchForm.seats}
-                                                onChange={(e) => setSearchForm({ ...searchForm, seats: e.target.value })}
-                                                required style={inputStyle}
-                                            />
+                                            <input type="number" min="1" value={searchForm.seats} onChange={(e) => setSearchForm({ ...searchForm, seats: e.target.value })} required style={inputStyle} />
                                         </div>
                                     </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={searching}
-                                        style={{
-                                            width: '100%', padding: '13px',
-                                            backgroundColor: searching ? theme.glassCard : theme.accent,
-                                            color: searching ? theme.textSecondary : '#0B1120',
-                                            border: 'none', borderRadius: '10px',
-                                            fontSize: '15px', fontWeight: '700',
-                                            cursor: searching ? 'not-allowed' : 'pointer',
-                                            fontFamily: "'DM Sans', sans-serif",
-                                            transition: 'all 0.2s ease',
-                                            boxShadow: searching ? 'none' : '0 4px 20px rgba(56,189,248,0.4)',
-                                        }}
-                                    >
+                                    <button type="submit" disabled={searching} style={{ width: '100%', padding: '13px', backgroundColor: searching ? theme.glassCard : theme.accent, color: searching ? theme.textSecondary : '#0B1120', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '700', cursor: searching ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s ease', boxShadow: searching ? 'none' : '0 4px 20px rgba(56,189,248,0.4)' }}>
                                         {searching ? 'Searching...' : '🔍 Search Rides'}
                                     </button>
                                 </form>
@@ -407,25 +333,11 @@ setActiveTab('my');
                             {/* Search Results */}
                             {searchResults.length > 0 && (
                                 <div>
-                                    <h2 style={{
-                                        fontFamily: "'Sora', sans-serif",
-                                        fontSize: '18px', fontWeight: '700',
-                                        color: theme.textPrimary, margin: '0 0 16px',
-                                    }}>
+                                    <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 16px' }}>
                                         {searchResults.length} Ride{searchResults.length > 1 ? 's' : ''} Found
                                     </h2>
                                     {searchResults.map((ride) => (
-                                        <div key={ride.id} style={{
-                                            backgroundColor: theme.glassCard,
-                                            backdropFilter: 'blur(16px)',
-                                            borderRadius: '16px',
-                                            border: `1px solid ${theme.glassBorder}`,
-                                            padding: '20px 24px',
-                                            marginBottom: '16px',
-                                            boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-                                            transition: 'all 0.2s ease',
-                                            cursor: 'pointer',
-                                        }}
+                                        <div key={ride.id} style={{ backgroundColor: theme.glassCard, backdropFilter: 'blur(16px)', borderRadius: '16px', border: `1px solid ${theme.glassBorder}`, padding: '20px 24px', marginBottom: '16px', boxShadow: '0 4px 24px rgba(0,0,0,0.2)', transition: 'all 0.2s ease' }}
                                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.glassHover; e.currentTarget.style.borderColor = 'rgba(56,189,248,0.3)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.glassCard; e.currentTarget.style.borderColor = theme.glassBorder; e.currentTarget.style.transform = 'translateY(0)'; }}
                                         >
@@ -434,16 +346,30 @@ setActiveTab('my');
                                                 <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '800', color: theme.textPrimary }}>{ride.origin}</span>
                                                 <span style={{ color: theme.accent, fontSize: '20px' }}>→</span>
                                                 <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '800', color: theme.textPrimary }}>{ride.destination}</span>
-                                                <span style={{
-                                                    marginLeft: 'auto', padding: '4px 14px',
-                                                    backgroundColor: 'rgba(56,189,248,0.15)',
-                                                    color: theme.accent, borderRadius: '100px',
-                                                    fontSize: '13px', fontWeight: '700',
-                                                    border: '1px solid rgba(56,189,248,0.3)',
-                                                }}>
+                                                <span style={{ marginLeft: 'auto', padding: '4px 14px', backgroundColor: 'rgba(56,189,248,0.15)', color: theme.accent, borderRadius: '100px', fontSize: '13px', fontWeight: '700', border: '1px solid rgba(56,189,248,0.3)' }}>
                                                     ₹{ride.price_per_seat}/seat
                                                 </span>
                                             </div>
+
+                                            {/* Waypoints */}
+                                            {ride.waypoints && ride.waypoints.length > 0 && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: 'rgba(56,189,248,0.05)', borderRadius: '8px', border: `1px solid rgba(56,189,248,0.15)`, marginBottom: '16px', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontSize: '12px', color: theme.textSecondary, fontWeight: '600' }}>📍 Route:</span>
+                                                    <span style={{ fontSize: '12px', color: theme.accent }}>{ride.origin}</span>
+                                                    {ride.waypoints.map((wp) => (
+                                                        <span key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
+                                                            <span style={{ fontSize: '12px', color: theme.accent, backgroundColor: 'rgba(56,189,248,0.1)', padding: '2px 8px', borderRadius: '100px', border: '1px solid rgba(56,189,248,0.2)' }}>
+                                                                {wp.location_name}
+                                                            </span>
+                                                        </span>
+                                                    ))}
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
+                                                        <span style={{ fontSize: '12px', color: theme.accent }}>{ride.destination}</span>
+                                                    </span>
+                                                </div>
+                                            )}
 
                                             {/* Details */}
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
@@ -462,16 +388,7 @@ setActiveTab('my');
                                             {/* Driver + Book */}
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{
-                                                        width: '38px', height: '38px',
-                                                        borderRadius: '10px',
-                                                        background: 'linear-gradient(135deg, #38BDF8, #0284C7)',
-                                                        display: 'flex', alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontWeight: '700', fontSize: '15px',
-                                                        color: 'white',
-                                                        boxShadow: '0 2px 10px rgba(56,189,248,0.3)',
-                                                    }}>
+                                                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg, #38BDF8, #0284C7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '15px', color: 'white', boxShadow: '0 2px 10px rgba(56,189,248,0.3)' }}>
                                                         {ride.driver_name?.[0]}
                                                     </div>
                                                     <div>
@@ -479,20 +396,8 @@ setActiveTab('my');
                                                         <div style={{ fontSize: '12px', color: theme.textSecondary }}>⭐ {ride.avg_rating}</div>
                                                     </div>
                                                 </div>
-
                                                 {user && ride.driver_id !== user.id && (
-                                                    <button
-                                                        onClick={() => handleBookRide(ride.id)}
-                                                        style={{
-                                                            padding: '10px 24px',
-                                                            backgroundColor: theme.successBg,
-                                                            color: theme.success,
-                                                            border: `1px solid rgba(52,211,153,0.3)`,
-                                                            borderRadius: '10px', fontSize: '14px',
-                                                            fontWeight: '700', cursor: 'pointer',
-                                                            fontFamily: "'DM Sans', sans-serif",
-                                                            transition: 'all 0.2s ease',
-                                                        }}
+                                                    <button onClick={() => handleBookRide(ride.id)} style={{ padding: '10px 24px', backgroundColor: theme.successBg, color: theme.success, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s ease' }}
                                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(52,211,153,0.25)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(52,211,153,0.2)'; }}
                                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.successBg; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
                                                     >
@@ -507,30 +412,16 @@ setActiveTab('my');
                         </div>
                     )}
 
-                    {/* Post Ride Tab */}
+                    {/* ── POST RIDE TAB ── */}
                     {activeTab === 'post' && user && (
-                        <div style={{
-                            backgroundColor: theme.glassCard,
-                            backdropFilter: 'blur(16px)',
-                            borderRadius: '20px',
-                            border: `1px solid ${theme.glassBorder}`,
-                            padding: '28px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                        }}>
-                            <h2 style={{
-                                fontFamily: "'Sora', sans-serif",
-                                fontSize: '18px', fontWeight: '700',
-                                color: theme.textPrimary, margin: '0 0 24px',
-                            }}>Post a Ride</h2>
+                        <div style={{ backgroundColor: theme.glassCard, backdropFilter: 'blur(16px)', borderRadius: '20px', border: `1px solid ${theme.glassBorder}`, padding: '28px', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+                            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 24px' }}>Post a Ride</h2>
 
                             <form onSubmit={handlePostRide}>
+                                {/* Vehicle */}
                                 <div style={{ marginBottom: '16px' }}>
                                     <label style={labelStyle}>Select Vehicle</label>
-                                    <select
-                                        value={postForm.vehicle_id}
-                                        onChange={(e) => setPostForm({ ...postForm, vehicle_id: e.target.value })}
-                                        required style={inputStyle}
-                                    >
+                                    <select value={postForm.vehicle_id} onChange={(e) => setPostForm({ ...postForm, vehicle_id: e.target.value })} required style={inputStyle}>
                                         <option value="" style={{ background: '#0B1120' }}>Choose your vehicle</option>
                                         {myVehicles.map((v) => (
                                             <option key={v.id} value={v.id} style={{ background: '#0B1120' }}>
@@ -540,6 +431,7 @@ setActiveTab('my');
                                     </select>
                                 </div>
 
+                                {/* Origin & Destination */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                     <div>
                                         <label style={labelStyle}>From</label>
@@ -549,6 +441,58 @@ setActiveTab('my');
                                         <label style={labelStyle}>To</label>
                                         <input placeholder="Destination city" value={postForm.destination} onChange={(e) => setPostForm({ ...postForm, destination: e.target.value })} required style={inputStyle} />
                                     </div>
+                                </div>
+
+                                {/* Waypoints */}
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={labelStyle}>Stops Along the Route (Optional)</label>
+                                    <p style={{ fontSize: '12px', color: theme.textSecondary, margin: '0 0 10px', fontFamily: "'DM Sans', sans-serif" }}>
+                                        Add intermediate stops so travelers can board from these locations
+                                    </p>
+
+                                    {/* Route preview */}
+                                    {(postForm.origin || postForm.waypoints.length > 0 || postForm.destination) && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: 'rgba(56,189,248,0.05)', borderRadius: '8px', border: `1px solid rgba(56,189,248,0.15)`, marginBottom: '12px', flexWrap: 'wrap' }}>
+                                            {postForm.origin && <span style={{ fontSize: '12px', color: theme.accent, fontWeight: '600' }}>{postForm.origin}</span>}
+                                            {postForm.waypoints.map((wp, i) => (
+                                                wp.location_name && (
+                                                    <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
+                                                        <span style={{ fontSize: '12px', color: theme.accent, backgroundColor: 'rgba(56,189,248,0.1)', padding: '2px 8px', borderRadius: '100px' }}>{wp.location_name}</span>
+                                                    </span>
+                                                )
+                                            ))}
+                                            {postForm.destination && (
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
+                                                    <span style={{ fontSize: '12px', color: theme.accent, fontWeight: '600' }}>{postForm.destination}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {postForm.waypoints.map((wp, index) => (
+                                        <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                                            <span style={{ color: theme.textSecondary, fontSize: '12px', minWidth: '60px' }}>Stop {index + 1}</span>
+                                            <input
+                                                placeholder={`e.g. Dewas`}
+                                                value={wp.location_name}
+                                                onChange={(e) => updateWaypoint(index, e.target.value)}
+                                                style={{ ...inputStyle, flex: 1 }}
+                                            />
+                                            <button type="button" onClick={() => removeWaypoint(index)} style={{ padding: '10px 14px', backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid ${theme.danger}30`, borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '700', flexShrink: 0 }}>
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    <button type="button" onClick={addWaypoint} style={{ padding: '9px 16px', backgroundColor: 'rgba(56,189,248,0.1)', color: theme.accent, border: `1px solid rgba(56,189,248,0.3)`, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: "'DM Sans', sans-serif", marginTop: '4px' }}>
+                                        + Add Stop
+                                    </button>
+                                </div>
+
+                                {/* Departure & Seats */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                     <div>
                                         <label style={labelStyle}>Departure Date & Time</label>
                                         <input type="datetime-local" value={postForm.departure_time} onChange={(e) => setPostForm({ ...postForm, departure_time: e.target.value })} required style={inputStyle} />
@@ -565,96 +509,42 @@ setActiveTab('my');
                                         <label style={labelStyle}>Price Per Seat (Auto)</label>
                                         <input
                                             placeholder="Auto calculated"
-                                            value={postForm.total_trip_cost && postForm.total_seats
-                                                ? `₹${(postForm.total_trip_cost / (parseInt(postForm.total_seats) + 1)).toFixed(2)}`
-                                                : ''}
+                                            value={postForm.total_trip_cost && postForm.total_seats ? `₹${(postForm.total_trip_cost / (parseInt(postForm.total_seats) + 1)).toFixed(2)}` : ''}
                                             disabled
                                             style={{ ...inputStyle, color: theme.success, fontWeight: '700', cursor: 'not-allowed' }}
                                         />
                                     </div>
                                 </div>
 
+                                {/* Description */}
                                 <div style={{ marginBottom: '20px' }}>
-                                    <label style={labelStyle}>Description (optional)</label>
-                                    <textarea
-                                        placeholder="Any additional info for travelers..."
-                                        value={postForm.description}
-                                        onChange={(e) => setPostForm({ ...postForm, description: e.target.value })}
-                                        rows={3}
-                                        style={{ ...inputStyle, resize: 'vertical' }}
-                                    />
+                                    <label style={labelStyle}>Description (Optional)</label>
+                                    <textarea placeholder="Any additional info for travelers..." value={postForm.description} onChange={(e) => setPostForm({ ...postForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
                                 </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={posting}
-                                    style={{
-                                        width: '100%', padding: '13px',
-                                        backgroundColor: posting ? theme.glassCard : theme.accent,
-                                        color: posting ? theme.textSecondary : '#0B1120',
-                                        border: 'none', borderRadius: '10px',
-                                        fontSize: '15px', fontWeight: '700',
-                                        cursor: posting ? 'not-allowed' : 'pointer',
-                                        fontFamily: "'DM Sans', sans-serif",
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: posting ? 'none' : '0 4px 20px rgba(56,189,248,0.4)',
-                                    }}
-                                >
+                                <button type="submit" disabled={posting} style={{ width: '100%', padding: '13px', backgroundColor: posting ? theme.glassCard : theme.accent, color: posting ? theme.textSecondary : '#0B1120', border: 'none', borderRadius: '10px', fontSize: '15px', fontWeight: '700', cursor: posting ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s ease', boxShadow: posting ? 'none' : '0 4px 20px rgba(56,189,248,0.4)' }}>
                                     {posting ? 'Posting...' : '🚗 Post Ride'}
                                 </button>
                             </form>
                         </div>
                     )}
 
-                    {/* My Rides Tab */}
+                    {/* ── MY RIDES TAB ── */}
                     {activeTab === 'my' && user && (
                         <div>
-                            <h2 style={{
-                                fontFamily: "'Sora', sans-serif",
-                                fontSize: '18px', fontWeight: '700',
-                                color: theme.textPrimary, margin: '0 0 16px',
-                            }}>My Posted Rides</h2>
+                            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 16px' }}>My Posted Rides</h2>
 
                             {myRides.length === 0 ? (
-                                <div style={{
-                                    backgroundColor: theme.glassCard,
-                                    backdropFilter: 'blur(16px)',
-                                    borderRadius: '16px',
-                                    border: `1px solid ${theme.glassBorder}`,
-                                    padding: '60px 40px',
-                                    textAlign: 'center',
-                                }}>
+                                <div style={{ backgroundColor: theme.glassCard, backdropFilter: 'blur(16px)', borderRadius: '16px', border: `1px solid ${theme.glassBorder}`, padding: '60px 40px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-                                    <p style={{ color: theme.textSecondary, fontSize: '15px', margin: '0 0 20px' }}>
-                                        You haven't posted any rides yet
-                                    </p>
-                                    <button
-                                        onClick={() => setActiveTab('post')}
-                                        style={{
-                                            padding: '11px 28px',
-                                            backgroundColor: theme.accent,
-                                            color: '#0B1120', border: 'none',
-                                            borderRadius: '10px', fontSize: '14px',
-                                            fontWeight: '700', cursor: 'pointer',
-                                            fontFamily: "'DM Sans', sans-serif",
-                                            boxShadow: '0 4px 20px rgba(56,189,248,0.4)',
-                                        }}
-                                    >
+                                    <p style={{ color: theme.textSecondary, fontSize: '15px', margin: '0 0 20px' }}>You haven't posted any rides yet</p>
+                                    <button onClick={() => setActiveTab('post')} style={{ padding: '11px 28px', backgroundColor: theme.accent, color: '#0B1120', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", boxShadow: '0 4px 20px rgba(56,189,248,0.4)' }}>
                                         Post Your First Ride
                                     </button>
                                 </div>
                             ) : (
                                 myRides.map((ride) => (
-                                    <div key={ride.id} style={{
-                                        backgroundColor: theme.glassCard,
-                                        backdropFilter: 'blur(16px)',
-                                        borderRadius: '16px',
-                                        border: `1px solid ${theme.glassBorder}`,
-                                        padding: '20px 24px',
-                                        marginBottom: '16px',
-                                        boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
-                                        transition: 'all 0.2s ease',
-                                    }}
+                                    <div key={ride.id} style={{ backgroundColor: theme.glassCard, backdropFilter: 'blur(16px)', borderRadius: '16px', border: `1px solid ${theme.glassBorder}`, padding: '20px 24px', marginBottom: '16px', boxShadow: '0 4px 24px rgba(0,0,0,0.2)', transition: 'all 0.2s ease' }}
                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.glassHover; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.glassCard; e.currentTarget.style.transform = 'translateY(0)'; }}
                                     >
@@ -664,17 +554,23 @@ setActiveTab('my');
                                                 <span style={{ color: theme.accent, fontSize: '20px' }}>→</span>
                                                 <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '800', color: theme.textPrimary }}>{ride.destination}</span>
                                             </div>
-                                            <span style={{
-                                                padding: '4px 14px',
-                                                backgroundColor: badgeStyle(ride.status).bg,
-                                                color: badgeStyle(ride.status).color,
-                                                borderRadius: '100px',
-                                                fontSize: '12px', fontWeight: '700',
-                                                border: `1px solid ${badgeStyle(ride.status).color}`,
-                                            }}>
+                                            <span style={{ padding: '4px 14px', backgroundColor: badgeStyle(ride.status).bg, color: badgeStyle(ride.status).color, borderRadius: '100px', fontSize: '12px', fontWeight: '700', border: `1px solid ${badgeStyle(ride.status).color}` }}>
                                                 {ride.status}
                                             </span>
                                         </div>
+
+                                        {/* Waypoints in my rides */}
+                                        {ride.waypoints && ride.waypoints.length > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: 'rgba(56,189,248,0.05)', borderRadius: '8px', border: `1px solid rgba(56,189,248,0.15)`, marginBottom: '12px', flexWrap: 'wrap' }}>
+                                                <span style={{ fontSize: '11px', color: theme.textSecondary }}>📍 Stops:</span>
+                                                {ride.waypoints.map((wp) => (
+                                                    <span key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ color: theme.textSecondary, fontSize: '9px' }}>→</span>
+                                                        <span style={{ fontSize: '11px', color: theme.accent, backgroundColor: 'rgba(56,189,248,0.1)', padding: '2px 8px', borderRadius: '100px' }}>{wp.location_name}</span>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
 
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                                             {[
