@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axiosInstance from '../utils/axiosInstance';
 
 const AuthContext = createContext();
 
@@ -13,7 +14,29 @@ export const AuthProvider = ({ children }) => {
         const savedUser = localStorage.getItem('user');
         if (token && savedUser) {
             setAccessToken(token);
-            setUser(JSON.parse(savedUser));
+            const parsedUser = JSON.parse(savedUser);
+            setUser(parsedUser);
+            
+            // Sync with backend to keep name, phone, pic, and admin status fresh
+            axiosInstance.get('/users/profile')
+                .then(res => {
+                    const freshUser = res.data.user;
+                    if (freshUser) {
+                        const updated = {
+                            ...parsedUser,
+                            name: freshUser.name,
+                            email: freshUser.email,
+                            phone: freshUser.phone,
+                            profile_pic: freshUser.profile_pic,
+                            is_admin: freshUser.is_admin
+                        };
+                        localStorage.setItem('user', JSON.stringify(updated));
+                        setUser(updated);
+                    }
+                })
+                .catch(err => {
+                    console.error('Failed to sync profile on mount:', err);
+                });
         }
         setLoading(false);
     }, []);
@@ -41,8 +64,15 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const updateUser = (newUserData) => {
+        const currentUser = JSON.parse(localStorage.getItem('user')) || {};
+        const updated = { ...currentUser, ...newUserData };
+        localStorage.setItem('user', JSON.stringify(updated));
+        setUser(updated);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, accessToken, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, accessToken, loading, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

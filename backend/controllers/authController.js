@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import pool from '../config/db.js';
-import { createUser, findUserByEmail } from '../models/userModel.js';
+import { createUser, findUserByEmail, findUserById } from '../models/userModel.js';
 import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
 import jwt from 'jsonwebtoken';
 
