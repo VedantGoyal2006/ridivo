@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import passport from 'passport';
 import './config/passport.js';
+import { apiRateLimiter } from './middleware/rateLimiter.js';
 
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -23,6 +24,9 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 app.use(passport.initialize());
+
+// Apply general API rate limiter globally
+app.use('/api', apiRateLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
