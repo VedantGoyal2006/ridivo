@@ -39,7 +39,7 @@ const navItems = [
   { icon: "💰", label: "Payments", path: "/payments" },
   { icon: "⭐", label: "Reviews", path: "/reviews" },
   { icon: "👤", label: "Profile", path: "/profile" },
-  { icon: "⚙️", label: "Settings", path: "/settings" },
+  { icon: "⚙️", label: "Settings", path: "/profile?tab=settings" },
 ];
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -260,7 +260,7 @@ function TopNav({ user, notifications, onLogout, onNavigate }) {
                 { icon: "🚗", label: "My Rides", path: "/my-rides" },
                 { icon: "📋", label: "My Bookings", path: "/bookings" },
                 { icon: "🛡️", label: "Become a Driver", path: "/verify" },
-                { icon: "⚙️", label: "Settings", path: "/settings" },
+                { icon: "⚙️", label: "Settings", path: "/profile?tab=settings" },
               ].map((item) => (
                 <button key={item.path} 
                 onClick={() => {onNavigate(item.path); navigate(item.path); setProfileOpen(false); }}

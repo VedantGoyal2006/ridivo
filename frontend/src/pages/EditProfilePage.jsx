@@ -29,7 +29,7 @@ const navItems = [
   { icon: "💰", label: "Payments", path: "/payments" },
   { icon: "⭐", label: "Reviews", path: "/reviews" },
   { icon: "👤", label: "Profile", path: "/profile" },
-  { icon: "⚙️", label: "Settings", path: "/settings" },
+  { icon: "⚙️", label: "Settings", path: "/profile?tab=settings" },
 ];
 
 // ── INPUT COMPONENT ───────────────────────────────────────────────────────────

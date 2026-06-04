@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyProfile, updateMyProfile } from "../services/userService";
 import axiosInstance from "../utils/axiosInstance";
@@ -119,12 +119,27 @@ function EditModal({ user, onClose, onSave }) {
 }
 
 export default function ProfilePage() {
+  const location = useLocation();
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    return ["overview", "reviews", "settings"].includes(tab) ? tab : "overview";
+  };
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [editOpen, setEditOpen] = useState(false);
-   const { logout, updateUser } = useAuth();
+  const { logout, updateUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && ["overview", "reviews", "settings"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -279,7 +294,7 @@ export default function ProfilePage() {
               { label: "Payments", icon: "💰", path: "/payments" },
               { label: "Reviews", icon: "⭐", path: "/reviews" },
               { label: "Profile", icon: "👤", path: "/profile", active: true },
-              { label: "Settings", icon: "⚙️", path: "/settings" },
+              { label: "Settings", icon: "⚙️", path: "/profile?tab=settings" },
             ].map((item) => (
               <div
                 key={item.label}
