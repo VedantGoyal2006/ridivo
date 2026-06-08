@@ -11,7 +11,7 @@ import verificationRoutes from './routes/verificationRoutes.js';
 import vehicleRoutes from './routes/vehicleRoutes.js';
 import rideRoutes from './routes/rideRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
-
+import aiRoutes from './routes/aiRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -31,6 +31,7 @@ app.use('/api/verification', verificationRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.get('/', (req, res) => {
     res.json({ message: 'Ridivo API is running' });

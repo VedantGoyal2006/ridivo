@@ -5,7 +5,8 @@ import {
     searchRides,
     createRide,
     getMyRides,
-    createBooking
+    createBooking,
+    getBookingsForRide
 } from '../services/rideService';
 import axiosInstance from '../utils/axiosInstance';
 
@@ -63,6 +64,10 @@ export default function RidesPage() {
     const [myVehicles, setMyVehicles] = useState([]);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [rideBookings, setRideBookings] = useState({});
+    const [loadingBookings, setLoadingBookings] = useState({});
+    const [aiLoading, setAiLoading] = useState(false);
+const [aiSuggestion, setAiSuggestion] = useState(null);
 
     useEffect(() => {
         if (user) {
@@ -71,14 +76,18 @@ export default function RidesPage() {
         }
     }, [user]);
 
-    const fetchMyRides = async () => {
-        try {
-            const data = await getMyRides();
-            setMyRides(data.rides);
-        } catch (err) {
-            console.error('Failed to fetch rides');
-        }
-    };
+   const fetchMyRides = async () => {
+    try {
+        const data = await getMyRides();
+        setMyRides(data.rides);
+        // Auto fetch bookings for each ride
+        data.rides.forEach(ride => {
+            fetchRideBookings(ride.id);
+        });
+    } catch (err) {
+        console.error('Failed to fetch rides');
+    }
+};
 
     const fetchMyVehicles = async () => {
         try {
@@ -88,6 +97,16 @@ export default function RidesPage() {
             console.error('Failed to fetch vehicles');
         }
     };
+    const fetchRideBookings = async (rideId) => {
+    setLoadingBookings(prev => ({ ...prev, [rideId]: true }));
+    try {
+        const data = await getBookingsForRide(rideId);
+        setRideBookings(prev => ({ ...prev, [rideId]: data.bookings }));
+    } catch (err) {
+        console.error('Failed to fetch ride bookings');
+    }
+    setLoadingBookings(prev => ({ ...prev, [rideId]: false }));
+};
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -177,6 +196,21 @@ export default function RidesPage() {
         newWaypoints[index].location_name = value;
         setPostForm({ ...postForm, waypoints: newWaypoints });
     };
+    const handleAISuggest = async () => {
+    setAiLoading(true);
+    setAiSuggestion(null);
+    try {
+        const response = await axiosInstance.post('/ai/suggest-price', {
+            origin: postForm.origin,
+            destination: postForm.destination
+        });
+        setAiSuggestion(response.data);
+    } catch (err) {
+        setError('AI suggestion failed. Please enter price manually.');
+        console.error('AI error:', err);
+    }
+    setAiLoading(false);
+};
 
     const inputStyle = {
         width: '100%',
@@ -435,12 +469,84 @@ export default function RidesPage() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                                     <div>
                                         <label style={labelStyle}>From</label>
-                                        <input placeholder="Origin city" value={postForm.origin} onChange={(e) => setPostForm({ ...postForm, origin: e.target.value })} required style={inputStyle} />
+                                        <input placeholder="Origin city" value={postForm.origin} onChange={(e) => { setPostForm({ ...postForm, origin: e.target.value }); setAiSuggestion(null); }} required style={inputStyle} />
                                     </div>
                                     <div>
                                         <label style={labelStyle}>To</label>
-                                        <input placeholder="Destination city" value={postForm.destination} onChange={(e) => setPostForm({ ...postForm, destination: e.target.value })} required style={inputStyle} />
+                                        <input placeholder="Destination city" value={postForm.destination}onChange={(e) => { setPostForm({ ...postForm, destination: e.target.value }); setAiSuggestion(null); }} required style={inputStyle} />
                                     </div>
+                                    <div style={{ gridColumn: 'span 2' }}>
+    <button
+        type="button"
+        onClick={handleAISuggest}
+        disabled={!postForm.origin || !postForm.destination || aiLoading}
+        style={{
+            width: '100%', padding: '11px',
+            backgroundColor: aiLoading ? 'rgba(167,139,250,0.1)' : 'rgba(167,139,250,0.15)',
+            color: '#A78BFA',
+            border: '1px solid rgba(167,139,250,0.3)',
+            borderRadius: '10px', fontSize: '14px',
+            fontWeight: '600', cursor: (!postForm.origin || !postForm.destination) ? 'not-allowed' : 'pointer',
+            fontFamily: "'DM Sans', sans-serif",
+            transition: 'all 0.2s ease',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '8px',
+        }}
+    >
+        {aiLoading ? '🤖 Calculating...' : '✨ AI Suggest Price'}
+    </button>
+</div>
+{aiSuggestion && (
+    <div style={{
+        gridColumn: 'span 2',
+        padding: '16px',
+        backgroundColor: 'rgba(167,139,250,0.08)',
+        borderRadius: '12px',
+        border: '1px solid rgba(167,139,250,0.3)',
+    }}>
+        <div style={{ fontSize: '13px', fontWeight: '700', color: '#A78BFA', marginBottom: '12px' }}>
+            ✨ AI Price Suggestion
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+            {[
+                { label: 'Distance', value: aiSuggestion.distance },
+                { label: 'Petrol Cost', value: aiSuggestion.petrol_cost },
+                { label: 'Est. Toll', value: aiSuggestion.toll_cost },
+            ].map((item) => (
+                <div key={item.label} style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px', border: `1px solid ${theme.glassBorder}` }}>
+                    <div style={{ fontSize: '10px', color: theme.textSecondary, letterSpacing: '0.5px', marginBottom: '4px' }}>{item.label}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#A78BFA' }}>{item.value}</div>
+                </div>
+            ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+                <div style={{ fontSize: '11px', color: theme.textSecondary }}>Suggested total cost</div>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: '#A78BFA', fontFamily: "'Sora', sans-serif" }}>
+                    {aiSuggestion.suggested_total}
+                </div>
+            </div>
+            <button
+                type="button"
+                onClick={() => setPostForm({ ...postForm, total_trip_cost: aiSuggestion.raw_total })}
+                style={{
+                    padding: '10px 20px',
+                    backgroundColor: 'rgba(167,139,250,0.2)',
+                    color: '#A78BFA',
+                    border: '1px solid rgba(167,139,250,0.4)',
+                    borderRadius: '8px', fontSize: '13px',
+                    fontWeight: '700', cursor: 'pointer',
+                    fontFamily: "'DM Sans', sans-serif",
+                }}
+            >
+                Use This Price ✓
+            </button>
+        </div>
+        <div style={{ marginTop: '10px', fontSize: '12px', color: theme.textSecondary, fontStyle: 'italic' }}>
+            {aiSuggestion.explanation}
+        </div>
+    </div>
+)}
                                 </div>
 
                                 {/* Waypoints */}
@@ -582,8 +688,111 @@ export default function RidesPage() {
                                                     <span>{detail.icon}</span>
                                                     <span style={{ fontSize: '12px', color: theme.textSecondary }}>{detail.text}</span>
                                                 </div>
+                                                
                                             ))}
                                         </div>
+                                        {/* Passengers Section */}
+{rideBookings[ride.id] && rideBookings[ride.id].length > 0 && (
+    <div style={{ marginTop: '16px', borderTop: `1px solid ${theme.glassBorder}`, paddingTop: '16px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '600', color: theme.textSecondary, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
+            👥 Passengers
+        </div>
+        {rideBookings[ride.id]
+            .filter(b => b.status === 'CONFIRMED')
+            .map((booking) => (
+                <div key={booking.id} style={{
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    backgroundColor: 'rgba(52,211,153,0.05)',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(52,211,153,0.15)',
+                    marginBottom: '8px',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Avatar */}
+                        <div style={{
+                            width: '36px', height: '36px',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, #34D399, #059669)',
+                            display: 'flex', alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: '700', fontSize: '14px',
+                            color: 'white',
+                            flexShrink: 0,
+                        }}>
+                            {booking.traveler_name?.[0] || 'T'}
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: theme.textPrimary }}>
+                                {booking.traveler_name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: theme.textSecondary }}>
+                                ⭐ {booking.traveler_rating} · {booking.seats_booked} seat{booking.seats_booked > 1 ? 's' : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: theme.success }}>
+                            ₹{booking.total_fare}
+                        </div>
+                        {booking.pickup_point && (
+                            <div style={{ fontSize: '11px', color: theme.textSecondary }}>
+                                📍 {booking.pickup_point}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))
+        }
+
+        {/* Show if no confirmed passengers */}
+        {rideBookings[ride.id].filter(b => b.status === 'CONFIRMED').length === 0 && (
+            <div style={{ fontSize: '13px', color: theme.textSecondary, padding: '10px', textAlign: 'center' }}>
+                No confirmed passengers yet
+            </div>
+        )}
+
+        {/* Pending requests */}
+        {rideBookings[ride.id].filter(b => b.status === 'PENDING').length > 0 && (
+            <div style={{ marginTop: '8px', padding: '10px 14px', backgroundColor: theme.warningBg, borderRadius: '8px', border: `1px solid rgba(251,191,36,0.2)` }}>
+                <span style={{ fontSize: '12px', color: theme.warning, fontWeight: '600' }}>
+                    ⏳ {rideBookings[ride.id].filter(b => b.status === 'PENDING').length} pending request(s) — go to Bookings page to accept/reject
+                </span>
+            </div>
+        )}
+    </div>
+)}
+
+{/* Loading state */}
+{loadingBookings[ride.id] && (
+    <div style={{ marginTop: '12px', fontSize: '12px', color: theme.textSecondary, textAlign: 'center' }}>
+        Loading passengers...
+    </div>
+)}
+
+{/* Seat availability summary */}
+<div style={{
+    marginTop: '12px',
+    padding: '10px 14px',
+    backgroundColor: ride.available_seats === 0 ? theme.dangerBg : theme.successBg,
+    borderRadius: '8px',
+    border: `1px solid ${ride.available_seats === 0 ? 'rgba(248,113,113,0.2)' : 'rgba(52,211,153,0.2)'}`,
+    display: 'flex', alignItems: 'center', gap: '8px',
+}}>
+    <span style={{ fontSize: '14px' }}>
+        {ride.available_seats === 0 ? '🚫' : '✅'}
+    </span>
+    <span style={{
+        fontSize: '13px', fontWeight: '600',
+        color: ride.available_seats === 0 ? theme.danger : theme.success,
+    }}>
+        {ride.available_seats === 0
+            ? 'Ride is FULL — no seats remaining'
+            : `${ride.available_seats} seat${ride.available_seats > 1 ? 's' : ''} still available`
+        }
+    </span>
+</div>
                                     </div>
                                 ))
                             )}

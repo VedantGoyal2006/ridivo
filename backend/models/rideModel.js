@@ -18,8 +18,7 @@ export const createRide = async (rideData) => {
         description
     } = rideData;
 
-    const price_per_seat = total_trip_cost / (total_seats + 1);
-
+const price_per_seat = parseFloat(total_trip_cost) / (parseInt(total_seats) + 1);
     const result = await pool.query(
         `INSERT INTO rides (
             driver_id, vehicle_id, origin, destination,
@@ -134,7 +133,7 @@ export const updateRide = async (id, rideData) => {
         description
     } = rideData;
 
-    const price_per_seat = total_trip_cost / (total_seats + 1);
+    const price_per_seat = parseFloat(total_trip_cost) / (parseInt(total_seats) + 1);
 
     const result = await pool.query(
         `UPDATE rides SET
