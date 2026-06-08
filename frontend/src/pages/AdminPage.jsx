@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import axiosInstance from "../utils/axiosInstance";
+import RidivoLogo from "../components/RidivoLogo";
 
 const theme = {
   bgBase: "#0B1120",
@@ -125,17 +126,7 @@ export default function AdminPage() {
           padding: "0 32px", position: "sticky", top: 0, zIndex: 50,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{ width: "32px", height: "32px", background: "linear-gradient(135deg, #38BDF8, #0284C7)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="16" height="16" viewBox="0 0 72 72" fill="none">
-                  <rect width="72" height="72" rx="16" fill="white" fillOpacity="0.2" />
-                  <rect x="16" y="12" width="8" height="46" rx="4" fill="white" />
-                  <path d="M24 14 Q48 14 48 26 Q48 38 24 38" fill="none" stroke="white" strokeWidth="8" strokeLinecap="round" />
-                  <line x1="24" y1="38" x2="50" y2="58" stroke="white" strokeWidth="8" strokeLinecap="round" />
-                </svg>
-              </div>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "700", color: "white" }}>Ridivo</span>
-            </div>
+            <RidivoLogo size={32} showText={true} textColor="white" />
             <div style={{ width: "1px", height: "20px", backgroundColor: theme.glassBorder }} />
             <span style={{ fontSize: "14px", color: theme.accent, fontWeight: "600" }}>⚙️ Admin Panel</span>
           </div>

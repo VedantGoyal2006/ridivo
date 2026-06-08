@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyProfile, updateMyProfile } from "../services/userService";
 import axiosInstance from "../utils/axiosInstance";
+import RidivoLogo from "../components/RidivoLogo";
 
 const avatarColors = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
 function getColor(str) {
@@ -118,12 +119,27 @@ function EditModal({ user, onClose, onSave }) {
 }
 
 export default function ProfilePage() {
+  const location = useLocation();
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    return ["overview", "reviews", "settings"].includes(tab) ? tab : "overview";
+  };
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [editOpen, setEditOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, updateUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && ["overview", "reviews", "settings"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -159,6 +175,7 @@ export default function ProfilePage() {
     try {
       const data = await updateMyProfile(updated.name, updated.phone, user.profile_pic);
       setUser({ ...user, name: data.user.name, phone: data.user.phone });
+      updateUser({ name: data.user.name, phone: data.user.phone });
     } catch (err) {
       console.error("Failed to update profile:", err);
       setUser({ ...user, ...updated });
@@ -265,8 +282,7 @@ export default function ProfilePage() {
         {/* Sidebar */}
         <aside className="sidebar">
           <div className="sidebar-logo" onClick={() => navigate("/dashboard")}>
-            <div className="logo-box">R</div>
-            <span className="logo-text">Ridivo</span>
+            <RidivoLogo size={36} showText={true} textColor="#f1f5f9" />
           </div>
           <nav className="nav-items">
             {[
@@ -278,7 +294,7 @@ export default function ProfilePage() {
               { label: "Payments", icon: "💰", path: "/payments" },
               { label: "Reviews", icon: "⭐", path: "/reviews" },
               { label: "Profile", icon: "👤", path: "/profile", active: true },
-              { label: "Settings", icon: "⚙️", path: "/settings" },
+              { label: "Settings", icon: "⚙️", path: "/profile?tab=settings" },
             ].map((item) => (
               <div
                 key={item.label}
@@ -477,12 +493,12 @@ export default function ProfilePage() {
               </>
             )}
             {/* Vehicles Section */}
-            {user.verification_status?.status === "APPROVED" && (
+            {activeTab === "overview" && user.verification_status?.status === "APPROVED" && (
               <div className="section-card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                   <div className="section-title" style={{ margin: 0 }}>My Vehicles</div>
                   <button className="btn-primary" style={{ fontSize: "12px", padding: "6px 14px" }}
-                    onClick={() => navigate("/add-vehicle")}>
+                    onClick={() => navigate("/edit-profile?tab=vehicles")}>
                     + Add Vehicle
                   </button>
                 </div>
@@ -518,7 +534,7 @@ export default function ProfilePage() {
                     <div style={{ fontSize: "32px", marginBottom: "8px" }}>🚗</div>
                     <div style={{ fontSize: "13px", marginBottom: "12px" }}>No vehicles added yet</div>
                     <button className="btn-primary" style={{ fontSize: "12px", padding: "7px 16px" }}
-                      onClick={() => navigate("/add-vehicle")}>
+                      onClick={() => navigate("/edit-profile?tab=vehicles")}>
                       Add Your First Vehicle
                     </button>
                   </div>

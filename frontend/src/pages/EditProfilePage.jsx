@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyProfile, updateMyProfile, changeMyPassword } from "../services/userService";
 import axiosInstance from "../utils/axiosInstance";
+import RidivoLogo from "../components/RidivoLogo";
 
 const theme = {
   bgBase: "#0B1120",
@@ -28,7 +29,7 @@ const navItems = [
   { icon: "💰", label: "Payments", path: "/payments" },
   { icon: "⭐", label: "Reviews", path: "/reviews" },
   { icon: "👤", label: "Profile", path: "/profile" },
-  { icon: "⚙️", label: "Settings", path: "/settings" },
+  { icon: "⚙️", label: "Settings", path: "/profile?tab=settings" },
 ];
 
 // ── INPUT COMPONENT ───────────────────────────────────────────────────────────
@@ -166,9 +167,26 @@ function SectionCard({ title, subtitle, children }) {
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function EditProfilePage() {
   const navigate = useNavigate();
-  const { user: authUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState("personal");
+  const location = useLocation();
+  const { user: authUser, logout, updateUser } = useAuth();
+
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    return ["personal", "password", "driver", "vehicles"].includes(tab) ? tab : "personal";
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [loading, setLoading] = useState(true);
+
+  // Sync tab state with query param if it changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && ["personal", "password", "driver", "vehicles"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   // Personal info state
   const [name, setName] = useState("");
@@ -238,6 +256,7 @@ export default function EditProfilePage() {
     setPersonalAlert({ type: "", message: "" });
     try {
       await updateMyProfile(name, phone, null);
+      updateUser({ name, phone });
       setPersonalAlert({ type: "success", message: "Profile updated successfully!" });
     } catch (err) {
       setPersonalAlert({ type: "error", message: err.response?.data?.message || "Failed to update profile" });
@@ -389,18 +408,7 @@ export default function EditProfilePage() {
         }}>
           <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${theme.glassBorder}`, cursor: "pointer" }}
             onClick={() => navigate("/dashboard")}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{ width: "34px", height: "34px", background: "linear-gradient(135deg, #38BDF8, #0284C7)", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="18" height="18" viewBox="0 0 72 72" fill="none">
-                  <rect width="72" height="72" rx="16" fill="url(#sg2)" />
-                  <rect x="16" y="12" width="8" height="46" rx="4" fill="white" />
-                  <path d="M24 14 Q48 14 48 26 Q48 38 24 38" fill="none" stroke="white" strokeWidth="8" strokeLinecap="round" />
-                  <line x1="24" y1="38" x2="50" y2="58" stroke="white" strokeWidth="8" strokeLinecap="round" />
-                  <defs><linearGradient id="sg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#38BDF8" /><stop offset="100%" stopColor="#0284C7" /></linearGradient></defs>
-                </svg>
-              </div>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "20px", fontWeight: "700", color: "white" }}>Ridivo</span>
-            </div>
+            <RidivoLogo size={34} showText={true} textColor="white" />
           </div>
 
           <nav style={{ padding: "16px 12px", flex: 1 }}>

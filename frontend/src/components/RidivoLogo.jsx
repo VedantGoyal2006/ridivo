@@ -1,4 +1,4 @@
-export default function RidivoLogo({ size = 38, showText = true }) {
+export default function RidivoLogo({ size = 38, showText = true, textColor = "#093C5D" }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
       <svg width={size} height={size} viewBox="0 0 72 72" fill="none">
@@ -18,7 +18,7 @@ export default function RidivoLogo({ size = 38, showText = true }) {
           fontFamily: "'DM Sans', sans-serif",
           fontSize: "22px",
           fontWeight: "700",
-          color: "#093C5D",
+          color: textColor,
           letterSpacing: "-0.5px",
         }}>Ridivo</span>
       )}

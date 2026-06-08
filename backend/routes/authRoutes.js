@@ -8,12 +8,13 @@ import {
     googleAuthCallback
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { loginRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
 // Email/Password routes
-router.post('/signup', signup);
-router.post('/login', login);
+router.post('/signup', loginRateLimiter, signup);
+router.post('/login', loginRateLimiter, login);
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 

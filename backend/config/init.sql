@@ -163,3 +163,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at      TIMESTAMP NOT NULL,
     created_at      TIMESTAMP DEFAULT NOW()
 );
+
+
+
+
+ALTER TABLE rides
+ADD COLUMN total_trip_cost DECIMAL(10,2) NOT NULL DEFAULT 0;
