@@ -9,12 +9,13 @@ import {
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
+import { validateSignup, validateLogin } from '../middleware/validator.js';
 
 const router = express.Router();
 
 // Email/Password routes
-router.post('/signup', loginRateLimiter, signup);
-router.post('/login', loginRateLimiter, login);
+router.post('/signup', loginRateLimiter, validateSignup, signup);
+router.post('/login', loginRateLimiter, validateLogin, login);
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 

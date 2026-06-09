@@ -9,11 +9,12 @@ import {
 } from '../controllers/verificationController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { adminOnly } from '../middleware/adminMiddleware.js';
+import { validateVerification } from '../middleware/validator.js';
 
 const router = express.Router();
 
 // User routes
-router.post('/apply', protect, applyForVerification);
+router.post('/apply', protect, validateVerification, applyForVerification);
 router.get('/status', protect, getVerificationStatus);
 
 // Admin routes

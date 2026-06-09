@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
+import { validateRide } from '../middleware/validator.js';
 import {
     createRide,
     searchRides,
@@ -19,7 +20,7 @@ const router = express.Router();
 router.get('/search', searchRides);
 router.get('/my-rides', protect, getMyRides);
 
-router.post('/', protect, createRide);
+router.post('/', protect, validateRide, createRide);
 router.get('/:id', getRideById);
 router.put('/:id', protect, updateRide);
 router.delete('/:id', protect, deleteRide);
