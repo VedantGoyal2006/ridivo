@@ -8,6 +8,7 @@ import {
     getRideById,
     updateRide,
     deleteRide,
+    completeRide,
     addWaypoints
 } from '../controllers/rideController.js';
 
@@ -24,6 +25,7 @@ router.post('/', protect, validateRide, createRide);
 router.get('/:id', getRideById);
 router.put('/:id', protect, updateRide);
 router.delete('/:id', protect, deleteRide);
+router.put('/:id/complete', protect, completeRide);
 router.post('/:id/waypoints', protect, addWaypoints);
 
 export default router;

@@ -63,3 +63,15 @@ export const cancelBooking = async (bookingId, cancellation_reason) => {
     });
     return response.data;
 };
+
+// Complete a ride (as driver)
+export const completeRide = async (id) => {
+    const response = await axiosInstance.put(`/rides/${id}/complete`);
+    return response.data;
+};
+
+// Cancel a ride (as driver)
+export const cancelRide = async (id) => {
+    const response = await axiosInstance.delete(`/rides/${id}`);
+    return response.data;
+};

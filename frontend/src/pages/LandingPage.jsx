@@ -1,5 +1,21 @@
 import { useState, useEffect, useRef } from "react";
-import RidivoLogo from '../components/RidivoLogo'
+import RidivoLogo from '../components/RidivoLogo';
+import {
+  Search,
+  Car,
+  MapPin,
+  Flag,
+  Coins,
+  ShieldCheck,
+  Leaf,
+  Zap,
+  Handshake,
+  Users,
+  Star,
+  Play,
+  Download,
+  Calendar
+} from "lucide-react";
 
 const colors = {
   dark: "#093C5D",
@@ -31,6 +47,7 @@ function Hero() {
   const [date, setDate] = useState("");
   const [seats, setSeats] = useState(1);
   const [loaded, setLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setLoaded(true), 100);
@@ -84,7 +101,7 @@ function Hero() {
               onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,0.2)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.15)"; }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.dark} strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+              <Search size={18} strokeWidth={2.5} style={{ color: colors.dark }} />
               Find a Ride
             </button>
             <button style={{
@@ -97,7 +114,7 @@ function Hero() {
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8l4 2v5h-4V8z" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+              <Car size={18} strokeWidth={2.5} style={{ color: "white" }} />
               Offer a Ride
             </button>
           </div>
@@ -135,13 +152,15 @@ function Hero() {
             boxShadow: "0 32px 80px rgba(0,0,0,0.4)",
             height: "420px", position: "relative",
           }}>
-            <img src="/src/assets/hero.jpg" alt="Travel together" style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={(e) => {
-                e.target.style.display = "none";
-                e.target.parentElement.style.background = "linear-gradient(135deg, #0d5280, #3B7597)";
-                e.target.parentElement.innerHTML += `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;font-size:80px;">🚗</div>`;
-              }}
-            />
+            {imgFailed ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: "linear-gradient(135deg, #0d5280, #3B7597)", color: "white" }}>
+                <Car size={80} strokeWidth={1.5} />
+              </div>
+            ) : (
+              <img src="/src/assets/hero.jpg" alt="Travel together" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                onError={() => setImgFailed(true)}
+              />
+            )}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(9,60,93,0.3) 0%, transparent 60%)" }} />
           </div>
 
@@ -165,7 +184,7 @@ function Hero() {
             <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ flex: 1, padding: "8px 10px", backgroundColor: colors.lightGray, border: "none", borderRadius: "10px", fontSize: "12px", fontFamily: "'DM Sans',sans-serif", outline: "none", color: "#374151" }} />
               <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 10px", backgroundColor: colors.lightGray, borderRadius: "10px" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={colors.gray} strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <Users size={13} style={{ color: colors.gray }} />
                 <span style={{ fontSize: "12px", color: "#374151", fontFamily: "'DM Sans',sans-serif" }}>{seats}</span>
               </div>
             </div>
@@ -201,20 +220,23 @@ function SearchBar() {
         display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: "16px", alignItems: "end",
       }}>
         {[
-          { label: "Leaving from", placeholder: "Enter departure city", icon: "📍" },
-          { label: "Going to", placeholder: "Enter destination city", icon: "🏁" },
-        ].map((f) => (
-          <div key={f.label}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: colors.gray, marginBottom: "8px", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", transition: "border-color 0.2s" }}
-              onFocus={(e) => e.currentTarget.style.borderColor = colors.dark}
-              onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
-            >
-              <span style={{ fontSize: "16px" }}>{f.icon}</span>
-              <input placeholder={f.placeholder} style={{ border: "none", outline: "none", fontSize: "14px", color: "#111", fontFamily: "'DM Sans',sans-serif", width: "100%", background: "transparent" }} />
+          { label: "Leaving from", placeholder: "Enter departure city", icon: MapPin },
+          { label: "Going to", placeholder: "Enter destination city", icon: Flag },
+        ].map((f) => {
+          const IconComp = f.icon;
+          return (
+            <div key={f.label}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: colors.gray, marginBottom: "8px", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>{f.label}</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", transition: "border-color 0.2s", backgroundColor: "white" }}
+                onFocus={(e) => e.currentTarget.style.borderColor = colors.dark}
+                onBlur={(e) => e.currentTarget.style.borderColor = "#e5e7eb"}
+              >
+                <IconComp size={16} style={{ color: colors.dark }} />
+                <input placeholder={f.placeholder} style={{ border: "none", outline: "none", fontSize: "14px", color: "#111", fontFamily: "'DM Sans',sans-serif", width: "100%", background: "transparent" }} />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div>
           <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: colors.gray, marginBottom: "8px", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.5px" }}>Date</label>
           <input type="date" style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: "10px", padding: "10px 14px", fontSize: "14px", fontFamily: "'DM Sans',sans-serif", outline: "none", color: "#111" }} />
@@ -244,29 +266,34 @@ function SearchBar() {
 function Features() {
   const [ref, inView] = useInView();
   const features = [
-    { icon: "💰", title: "Save Money", color: "#10B981", desc: "Share travel costs and save up to 50% on every trip." },
-    { icon: "🛡️", title: "Verified Profiles", color: "#3B82F6", desc: "All users go through verification for a safe experience." },
-    { icon: "🌿", title: "Eco Friendly", color: "#84CC16", desc: "Reduce carbon footprint by sharing rides and reducing traffic." },
-    { icon: "⚡", title: "Instant Booking", color: "#F59E0B", desc: "Real-time seat availability and instant ride confirmations." },
+    { icon: Coins, title: "Save Money", color: "#10B981", desc: "Share travel costs and save up to 50% on every trip." },
+    { icon: ShieldCheck, title: "Verified Profiles", color: "#3B82F6", desc: "All users go through verification for a safe experience." },
+    { icon: Leaf, title: "Eco Friendly", color: "#84CC16", desc: "Reduce carbon footprint by sharing rides and reducing traffic." },
+    { icon: Zap, title: "Instant Booking", color: "#F59E0B", desc: "Real-time seat availability and instant ride confirmations." },
   ];
   return (
     <section ref={ref} style={{ backgroundColor: "white", padding: "60px 40px 80px" }}>
       <div style={{ maxWidth: "1100px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "24px" }}>
-        {features.map((f, i) => (
-          <div key={f.title} style={{
-            padding: "28px 24px", borderRadius: "16px", border: "1px solid #f3f4f6",
-            backgroundColor: "white", transition: "all 0.3s ease",
-            opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(24px)",
-            transitionDelay: `${i * 0.1}s`,
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 8px 30px rgba(9,60,93,0.1)"; e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = "#dbeafe"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "#f3f4f6"; }}
-          >
-            <div style={{ width: "48px", height: "48px", backgroundColor: `${f.color}15`, borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", marginBottom: "16px" }}>{f.icon}</div>
+        {features.map((f, i) => {
+          const IconComp = f.icon;
+          return (
+            <div key={f.title} style={{
+              padding: "28px 24px", borderRadius: "16px", border: "1px solid #f3f4f6",
+              backgroundColor: "white", transition: "all 0.3s ease",
+              opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(24px)",
+              transitionDelay: `${i * 0.1}s`,
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 8px 30px rgba(9,60,93,0.1)"; e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = "#dbeafe"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = "#f3f4f6"; }}
+            >
+              <div style={{ width: "48px", height: "48px", backgroundColor: `${f.color}15`, borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", color: f.color, marginBottom: "16px" }}>
+                <IconComp size={22} />
+              </div>
             <h3 style={{ fontFamily: "'Sora',sans-serif", fontSize: "16px", fontWeight: "700", color: colors.dark, marginBottom: "8px" }}>{f.title}</h3>
             <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", color: colors.gray, lineHeight: "1.6" }}>{f.desc}</p>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -276,10 +303,10 @@ function Features() {
 function HowItWorks() {
   const [ref, inView] = useInView();
   const steps = [
-    { icon: "🔍", num: "01", title: "Search or Offer", desc: "Find a ride or offer your seats for your next trip." },
-    { icon: "🤝", num: "02", title: "Connect", desc: "Choose from verified travelers and confirm your ride." },
-    { icon: "💸", num: "03", title: "Share Costs", desc: "Split the travel cost fairly and transparently within the app." },
-    { icon: "🚗", num: "04", title: "Travel Together", desc: "Enjoy your journey safely and comfortably together." },
+    { icon: Search, num: "01", title: "Search or Offer", desc: "Find a ride or offer your seats for your next trip." },
+    { icon: Handshake, num: "02", title: "Connect", desc: "Choose from verified travelers and confirm your ride." },
+    { icon: Coins, num: "03", title: "Share Costs", desc: "Split the travel cost fairly and transparently within the app." },
+    { icon: Car, num: "04", title: "Travel Together", desc: "Enjoy your journey safely and comfortably together." },
   ];
   return (
     <section ref={ref} style={{ backgroundColor: colors.lightGray, padding: "100px 40px" }}>
@@ -290,24 +317,29 @@ function HowItWorks() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "32px", position: "relative" }}>
           <div style={{ position: "absolute", top: "40px", left: "12%", right: "12%", height: "2px", background: `linear-gradient(to right, ${colors.dark}, ${colors.mid})`, opacity: 0.2, zIndex: 0 }} />
-          {steps.map((s, i) => (
-            <div key={s.num} style={{
-              textAlign: "center", position: "relative", zIndex: 1,
-              opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(30px)",
-              transition: `all 0.6s ease ${i * 0.15}s`,
-            }}>
-              <div style={{
-                width: "80px", height: "80px", borderRadius: "50%",
-                backgroundColor: "white", border: `3px solid ${colors.dark}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 20px", fontSize: "28px",
-                boxShadow: `0 8px 24px rgba(9,60,93,0.12)`,
-              }}>{s.icon}</div>
-              <div style={{ fontSize: "12px", fontWeight: "700", color: colors.mid, letterSpacing: "1px", marginBottom: "8px", fontFamily: "'DM Sans',sans-serif" }}>STEP {s.num}</div>
-              <h3 style={{ fontFamily: "'Sora',sans-serif", fontSize: "17px", fontWeight: "700", color: colors.dark, marginBottom: "10px" }}>{s.title}</h3>
-              <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", color: colors.gray, lineHeight: "1.6" }}>{s.desc}</p>
-            </div>
-          ))}
+          {steps.map((s, i) => {
+            const IconComp = s.icon;
+            return (
+              <div key={s.num} style={{
+                textAlign: "center", position: "relative", zIndex: 1,
+                opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(30px)",
+                transition: `all 0.6s ease ${i * 0.15}s`,
+              }}>
+                <div style={{
+                  width: "80px", height: "80px", borderRadius: "50%",
+                  backgroundColor: "white", border: `3px solid ${colors.dark}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  margin: "0 auto 20px", color: colors.dark,
+                  boxShadow: `0 8px 24px rgba(9,60,93,0.12)`,
+                }}>
+                  <IconComp size={28} />
+                </div>
+                <div style={{ fontSize: "12px", fontWeight: "700", color: colors.mid, letterSpacing: "1px", marginBottom: "8px", fontFamily: "'DM Sans',sans-serif" }}>STEP {s.num}</div>
+                <h3 style={{ fontFamily: "'Sora',sans-serif", fontSize: "17px", fontWeight: "700", color: colors.dark, marginBottom: "10px" }}>{s.title}</h3>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "14px", color: colors.gray, lineHeight: "1.6" }}>{s.desc}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -318,10 +350,10 @@ function HowItWorks() {
 function Stats() {
   const [ref, inView] = useInView();
   const stats = [
-    { icon: "👥", value: "50K+", label: "Happy Members" },
-    { icon: "🚗", value: "15K+", label: "Rides Shared" },
-    { icon: "📍", value: "1200+", label: "Cities Covered" },
-    { icon: "⭐", value: "4.8/5", label: "User Rating" },
+    { icon: Users, value: "50K+", label: "Happy Members" },
+    { icon: Car, value: "15K+", label: "Rides Shared" },
+    { icon: MapPin, value: "1200+", label: "Cities Covered" },
+    { icon: Star, value: "4.8/5", label: "User Rating" },
   ];
   return (
     <section ref={ref} style={{ position: "relative", overflow: "hidden" }}>
@@ -333,18 +365,23 @@ function Stats() {
         {/* Background texture */}
         <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 20% 50%, rgba(255,255,255,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.03) 0%, transparent 50%)", pointerEvents: "none" }} />
         <div style={{ maxWidth: "1100px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "40px", position: "relative", zIndex: 1 }}>
-          {stats.map((s, i) => (
-            <div key={s.label} style={{
-              textAlign: "center",
-              opacity: inView ? 1 : 0,
-              transform: inView ? "translateY(0) scale(1)" : "translateY(20px) scale(0.95)",
-              transition: `all 0.6s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s`,
-            }}>
-              <div style={{ fontSize: "36px", marginBottom: "12px" }}>{s.icon}</div>
-              <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "clamp(32px,4vw,48px)", fontWeight: "800", color: "white", lineHeight: 1, marginBottom: "8px" }}>{s.value}</div>
-              <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "15px", color: "rgba(255,255,255,0.65)" }}>{s.label}</div>
-            </div>
-          ))}
+          {stats.map((s, i) => {
+            const IconComp = s.icon;
+            return (
+              <div key={s.label} style={{
+                textAlign: "center",
+                opacity: inView ? 1 : 0,
+                transform: inView ? "translateY(0) scale(1)" : "translateY(20px) scale(0.95)",
+                transition: `all 0.6s cubic-bezier(0.16,1,0.3,1) ${i * 0.1}s`,
+              }}>
+                <div style={{ display: "flex", justifyContent: "center", color: "white", marginBottom: "16px" }}>
+                  <IconComp size={36} />
+                </div>
+                <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "clamp(32px,4vw,48px)", fontWeight: "800", color: "white", lineHeight: 1, marginBottom: "8px" }}>{s.value}</div>
+                <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "15px", color: "rgba(255,255,255,0.65)" }}>{s.label}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -366,7 +403,9 @@ function EarnSection() {
           transition: "all 0.8s cubic-bezier(0.16,1,0.3,1)",
         }}>
           <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "200px", height: "200px", background: "radial-gradient(circle, rgba(59,117,151,0.15), transparent)", borderRadius: "50%" }} />
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🚗</div>
+          <div style={{ color: colors.dark, marginBottom: "16px" }}>
+            <Car size={48} strokeWidth={1.5} />
+          </div>
           <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "20px 24px", boxShadow: "0 8px 24px rgba(9,60,93,0.1)", marginBottom: "16px" }}>
             <div style={{ fontSize: "12px", color: colors.gray, fontFamily: "'DM Sans',sans-serif", marginBottom: "6px" }}>This Month's Earnings</div>
             <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "36px", fontWeight: "800", color: colors.dark }}>₹24,680</div>
@@ -386,7 +425,7 @@ function EarnSection() {
         {/* Right text */}
         <div style={{ opacity: inView ? 1 : 0, transform: inView ? "translateX(0)" : "translateX(30px)", transition: "all 0.8s cubic-bezier(0.16,1,0.3,1) 0.2s" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", backgroundColor: "#EFF6FF", borderRadius: "100px", padding: "6px 16px", marginBottom: "24px" }}>
-            <span style={{ fontSize: "14px" }}>🚗</span>
+            <Car size={14} style={{ color: colors.mid }} />
             <span style={{ fontSize: "13px", fontWeight: "600", color: colors.mid, fontFamily: "'DM Sans',sans-serif" }}>Drive & Earn</span>
           </div>
           <h2 style={{ fontFamily: "'Sora',sans-serif", fontSize: "clamp(28px,4vw,44px)", fontWeight: "800", color: colors.dark, lineHeight: "1.15", marginBottom: "8px" }}>Got Empty Seats?</h2>
@@ -400,12 +439,12 @@ function EarnSection() {
             border: "none", borderRadius: "12px", padding: "14px 28px",
             fontSize: "15px", fontWeight: "700", cursor: "pointer",
             fontFamily: "'DM Sans',sans-serif", transition: "all 0.25s ease",
-            boxShadow: `0 4px 20px rgba(9,60,93,0.25)`,
+            boxShadow: `0 4px 20px rgba(9, 60, 93, 0.25)`,
           }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(9,60,93,0.35)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(9,60,93,0.25)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(9, 60, 93, 0.35)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(9, 60, 93, 0.25)"; }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><rect x="1" y="3" width="15" height="13" rx="2" /><path d="M16 8l4 2v5h-4V8z" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+            <Car size={18} strokeWidth={2.5} style={{ color: "white" }} />
             Offer a Ride
           </button>
         </div>
@@ -508,25 +547,30 @@ function Footer() {
           <div>
             <h4 style={{ fontFamily: "'Sora',sans-serif", fontSize: "14px", fontWeight: "700", color: "white", marginBottom: "20px" }}>Download App</h4>
             {[
-              { store: "Google Play", icon: "▶" },
-              { store: "App Store", icon: "" },
-            ].map((app) => (
-              <div key={app.store} style={{
-                display: "flex", alignItems: "center", gap: "12px",
-                backgroundColor: "rgba(255,255,255,0.08)", borderRadius: "12px",
-                padding: "12px 16px", marginBottom: "12px", cursor: "pointer",
-                transition: "background 0.2s",
-              }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.14)"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"}
-              >
-                <span style={{ fontSize: "20px" }}>{app.icon}</span>
-                <div>
-                  <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>Get it on</div>
-                  <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "13px", fontWeight: "700", color: "white" }}>{app.store}</div>
+              { store: "Google Play", icon: Play, isFill: true },
+              { store: "App Store", icon: Download, isFill: false },
+            ].map((app) => {
+              const IconComp = app.icon;
+              return (
+                <div key={app.store} style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  backgroundColor: "rgba(255,255,255,0.08)", borderRadius: "12px",
+                  padding: "12px 16px", marginBottom: "12px", cursor: "pointer",
+                  transition: "background 0.2s", color: "white"
+                }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.14)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <IconComp size={20} fill={app.isFill ? "currentColor" : "none"} />
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>Get it on</div>
+                    <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "13px", fontWeight: "700", color: "white" }}>{app.store}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

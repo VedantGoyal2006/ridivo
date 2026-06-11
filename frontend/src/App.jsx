@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
+import DashboardLayout from './components/DashboardLayout'
 import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -32,8 +33,8 @@ function AuthSuccess() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#0B1120' }}>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '18px', color: '#38BDF8' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#EFF6FF' }}>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '18px', color: '#093C5D' }}>
         Logging you in...
       </p>
     </div>
@@ -48,32 +49,18 @@ function App() {
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
-<Route path="/auth/success" element={<AuthSuccess />} />
+        <Route path="/auth/success" element={<AuthSuccess />} />
 
-        {/* Protected routes */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute><ProfilePage /></ProtectedRoute>
-        } />
-        <Route path="/edit-profile" element={
-          <ProtectedRoute><EditProfilePage /></ProtectedRoute>
-        } />
-        <Route path="/verify" element={
-          <ProtectedRoute><VerificationPage /></ProtectedRoute>
-        } />
-        <Route path="/rides" element={
-          <ProtectedRoute><RidesPage /></ProtectedRoute>
-        } />
-        <Route path="/bookings" element={
-          <ProtectedRoute><BookingsPage /></ProtectedRoute>
-        } />
-
-        {/* Admin only route */}
-        <Route path="/admin" element={
-          <ProtectedRoute adminOnly={true}><AdminPage /></ProtectedRoute>
-        } />
+        {/* Protected routes wrapped in DashboardLayout */}
+        <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/edit-profile" element={<EditProfilePage />} />
+          <Route path="/verify" element={<VerificationPage />} />
+          <Route path="/rides" element={<RidesPage />} />
+          <Route path="/bookings" element={<BookingsPage />} />
+          <Route path="/admin" element={<ProtectedRoute adminOnly={true}><AdminPage /></ProtectedRoute>} />
+        </Route>
       </Routes>
     </BrowserRouter>
   )

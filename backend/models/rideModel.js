@@ -186,6 +186,20 @@ export const cancelRide = async (id) => {
     return result.rows[0];
 };
 
+// Complete a ride
+export const completeRide = async (id) => {
+    const result = await pool.query(
+        `UPDATE rides SET
+            status = 'COMPLETED',
+            updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [id]
+    );
+
+    return result.rows[0];
+};
+
 // Add waypoints to a ride
 export const addWaypoints = async (ride_id, waypoints) => {
     // Delete existing waypoints first

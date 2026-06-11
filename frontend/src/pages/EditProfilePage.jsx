@@ -3,34 +3,40 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMyProfile, updateMyProfile, changeMyPassword } from "../services/userService";
 import axiosInstance from "../utils/axiosInstance";
-import RidivoLogo from "../components/RidivoLogo";
+import {
+  User,
+  Key,
+  ShieldCheck,
+  Car,
+  Bike,
+  Plus,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+  Check,
+  Trash2,
+  Lock,
+} from "lucide-react";
 
 const theme = {
-  bgBase: "#0B1120",
-  glassCard: "rgba(255, 255, 255, 0.03)",
-  glassCardHeavy: "rgba(15, 23, 42, 0.8)",
-  glassHover: "rgba(255, 255, 255, 0.08)",
-  glassBorder: "rgba(255, 255, 255, 0.08)",
-  textPrimary: "#F8FAFC",
-  textSecondary: "#94A3B8",
-  accent: "#38BDF8",
-  accentHover: "#0284C7",
-  successText: "#34D399",
-  warningText: "#FBBF24",
-  errorText: "#FCA5A5",
+  bgCard: "#FFFFFF",
+  border: "#E2E8F0",
+  textPrimary: "#093C5D",
+  textSecondary: "#6B7280",
+  textMuted: "#94A3B8",
+  accent: "#3B7597",
+  accentDark: "#093C5D",
+  accentLight: "#EFF6FF",
+  success: "#10B981",
+  successBg: "#EFFDF4",
+  successText: "#10B981",
+  warning: "#F59E0B",
+  warningBg: "#FEF3C7",
+  warningText: "#D97706",
+  danger: "#EF4444",
+  dangerBg: "#FEE2E2",
+  errorText: "#EF4444",
 };
-
-const navItems = [
-  { icon: "⊞", label: "Dashboard", path: "/dashboard" },
-  { icon: "🔍", label: "Find a Ride", path: "/find-ride" },
-  { icon: "🚗", label: "My Rides", path: "/my-rides" },
-  { icon: "➕", label: "Offer a Ride", path: "/offer-ride" },
-  { icon: "📋", label: "Bookings", path: "/bookings" },
-  { icon: "💰", label: "Payments", path: "/payments" },
-  { icon: "⭐", label: "Reviews", path: "/reviews" },
-  { icon: "👤", label: "Profile", path: "/profile" },
-  { icon: "⚙️", label: "Settings", path: "/profile?tab=settings" },
-];
 
 // ── INPUT COMPONENT ───────────────────────────────────────────────────────────
 function GlassInput({ label, type = "text", value, onChange, placeholder, disabled, hint, required }) {
@@ -38,12 +44,12 @@ function GlassInput({ label, type = "text", value, onChange, placeholder, disabl
   return (
     <div style={{ marginBottom: "20px" }}>
       <label style={{
-        display: "block", fontSize: "11px", fontWeight: "600",
+        display: "block", fontSize: "11px", fontWeight: "700",
         color: theme.textSecondary, marginBottom: "8px",
         textTransform: "uppercase", letterSpacing: "0.8px",
         fontFamily: "'DM Sans', sans-serif",
       }}>
-        {label} {required && <span style={{ color: theme.accent }}>*</span>}
+        {label} {required && <span style={{ color: theme.danger }}>*</span>}
       </label>
       <input
         type={type}
@@ -55,17 +61,17 @@ function GlassInput({ label, type = "text", value, onChange, placeholder, disabl
         onBlur={() => setFocused(false)}
         style={{
           width: "100%", padding: "12px 16px",
-          backgroundColor: disabled ? "rgba(0,0,0,0.2)" : focused ? "rgba(56,189,248,0.05)" : "rgba(0,0,0,0.3)",
-          border: `1px solid ${focused ? theme.accent : theme.glassBorder}`,
-          borderRadius: "12px", color: disabled ? theme.textSecondary : theme.textPrimary,
+          backgroundColor: disabled ? "#F3F4F6" : "#F9FAFB",
+          border: `1.5px solid ${focused ? theme.accent : theme.border}`,
+          borderRadius: "12px", color: disabled ? theme.textMuted : theme.textPrimary,
           fontSize: "14px", fontFamily: "'DM Sans', sans-serif",
           outline: "none", transition: "all 0.2s ease",
           cursor: disabled ? "not-allowed" : "text",
-          boxShadow: focused ? `0 0 0 3px rgba(56,189,248,0.1)` : "none",
+          boxShadow: focused ? `0 0 0 3px rgba(59,117,151,0.1)` : "none",
           boxSizing: "border-box",
         }}
       />
-      {hint && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "5px", fontFamily: "'DM Sans', sans-serif" }}>{hint}</div>}
+      {hint && <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "5px", fontFamily: "'DM Sans', sans-serif", fontWeight: "500" }}>{hint}</div>}
     </div>
   );
 }
@@ -75,20 +81,20 @@ function GlassSelect({ label, value, onChange, options, required }) {
   return (
     <div style={{ marginBottom: "20px" }}>
       <label style={{
-        display: "block", fontSize: "11px", fontWeight: "600",
+        display: "block", fontSize: "11px", fontWeight: "700",
         color: theme.textSecondary, marginBottom: "8px",
         textTransform: "uppercase", letterSpacing: "0.8px",
         fontFamily: "'DM Sans', sans-serif",
       }}>
-        {label} {required && <span style={{ color: theme.accent }}>*</span>}
+        {label} {required && <span style={{ color: theme.danger }}>*</span>}
       </label>
       <select
         value={value}
         onChange={onChange}
         style={{
           width: "100%", padding: "12px 16px",
-          backgroundColor: "rgba(0,0,0,0.3)",
-          border: `1px solid ${theme.glassBorder}`,
+          backgroundColor: "#F9FAFB",
+          border: `1.5px solid ${theme.border}`,
           borderRadius: "12px", color: theme.textPrimary,
           fontSize: "14px", fontFamily: "'DM Sans', sans-serif",
           outline: "none", cursor: "pointer",
@@ -96,7 +102,7 @@ function GlassSelect({ label, value, onChange, options, required }) {
         }}
       >
         {options.map(opt => (
-          <option key={opt.value} value={opt.value} style={{ background: "#0B1120" }}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
     </div>
@@ -111,17 +117,18 @@ function SaveButton({ onClick, loading, label = "Save Changes" }) {
       disabled={loading}
       style={{
         padding: "12px 28px",
-        background: loading ? "rgba(56,189,248,0.3)" : `linear-gradient(135deg, ${theme.accent}, ${theme.accentHover})`,
+        background: loading ? theme.border : theme.textPrimary,
         color: "white", border: "none", borderRadius: "12px",
         fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer",
         fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s ease",
-        boxShadow: loading ? "none" : `0 4px 16px rgba(56,189,248,0.3)`,
+        boxShadow: loading ? "none" : `0 4px 12px rgba(9, 60, 93, 0.15)`,
         display: "flex", alignItems: "center", gap: "8px",
       }}
-      onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 8px 24px rgba(56,189,248,0.4)`; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 16px rgba(56,189,248,0.3)`; }}
+      onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.backgroundColor = "#07304b"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.textPrimary; e.currentTarget.style.transform = "translateY(0)"; }}
     >
-      {loading ? "⏳ Saving..." : `✓ ${label}`}
+      <Check size={16} />
+      {loading ? "Saving..." : `${label}`}
     </button>
   );
 }
@@ -130,18 +137,20 @@ function SaveButton({ onClick, loading, label = "Save Changes" }) {
 function Alert({ type, message }) {
   if (!message) return null;
   const styles = {
-    success: { bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.3)", color: theme.successText, icon: "✅" },
-    error: { bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.3)", color: theme.errorText, icon: "⚠️" },
+    success: { bg: theme.successBg, border: "rgba(16,185,129,0.2)", color: theme.successText, icon: CheckCircle },
+    error: { bg: theme.dangerBg, border: "rgba(239,68,68,0.2)", color: theme.errorText, icon: AlertCircle },
   };
   const s = styles[type];
+  const IconComp = s.icon;
   return (
     <div style={{
       padding: "12px 16px", borderRadius: "10px",
       backgroundColor: s.bg, border: `1px solid ${s.border}`,
       color: s.color, fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
       marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px",
+      fontWeight: "600"
     }}>
-      {s.icon} {message}
+      <IconComp size={16} /> {message}
     </div>
   );
 }
@@ -150,10 +159,10 @@ function Alert({ type, message }) {
 function SectionCard({ title, subtitle, children }) {
   return (
     <div style={{
-      backgroundColor: theme.glassCard, backdropFilter: "blur(16px)",
-      border: `1px solid ${theme.glassBorder}`, borderRadius: "20px",
+      backgroundColor: theme.bgCard,
+      border: `1px solid ${theme.border}`, borderRadius: "20px",
       padding: "28px", marginBottom: "20px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+      boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)",
     }}>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px" }}>{title}</div>
@@ -168,7 +177,7 @@ function SectionCard({ title, subtitle, children }) {
 export default function EditProfilePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user: authUser, logout, updateUser } = useAuth();
+  const { user: authUser, updateUser } = useAuth();
 
   const getInitialTab = () => {
     const params = new URLSearchParams(location.search);
@@ -365,318 +374,224 @@ export default function EditProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: theme.bgBase, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 0" }}>
         <div style={{ color: theme.accent, fontFamily: "'DM Sans', sans-serif", fontSize: "18px" }}>Loading...</div>
       </div>
     );
   }
 
   const tabs = [
-    { id: "personal", label: "👤 Personal Info", desc: "Name, phone, email" },
-    { id: "password", label: "🔒 Password", desc: "Change password" },
-    { id: "driver", label: "🛡️ Driver Verification", desc: "License & Aadhar" },
-    { id: "vehicles", label: "🚗 My Vehicles", desc: "Add & manage vehicles" },
+    { id: "personal", label: "Personal Info", icon: User },
+    { id: "password", label: "Password", icon: Lock },
+    { id: "driver", label: "Driver Verification", icon: ShieldCheck },
+    { id: "vehicles", label: "My Vehicles", icon: Car },
   ];
-
-  const premiumBg = {
-    minHeight: "100vh", display: "flex",
-    backgroundColor: theme.bgBase,
-    backgroundImage: `
-      radial-gradient(circle at 15% 50%, rgba(56,189,248,0.06), transparent 25%),
-      radial-gradient(circle at 85% 30%, rgba(167,139,250,0.06), transparent 25%),
-      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)
-    `,
-    backgroundSize: "100% 100%, 100% 100%, 40px 40px, 40px 40px",
-    fontFamily: "'DM Sans', sans-serif",
-    color: theme.textPrimary,
-  };
 
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <div style={premiumBg}>
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+        {/* Navigation Action Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+          <button onClick={() => navigate("/profile")} style={{
+            background: "white", border: `1px solid ${theme.border}`,
+            borderRadius: "8px", padding: "8px 14px", color: theme.textSecondary,
+            cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
+            display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
+            fontWeight: "600"
+          }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = theme.textPrimary; e.currentTarget.style.borderColor = theme.accent; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.borderColor = theme.border; }}
+          >
+            <ArrowLeft size={14} /> Back to Profile
+          </button>
+        </div>
 
-        {/* ── SIDEBAR ── */}
-        <aside style={{
-          width: "240px", flexShrink: 0,
-          backgroundColor: "rgba(11,17,32,0.75)", backdropFilter: "blur(20px)",
-          borderRight: `1px solid ${theme.glassBorder}`,
-          height: "100vh", position: "fixed", left: 0, top: 0,
-          display: "flex", flexDirection: "column", zIndex: 100, overflowY: "auto",
+        {/* Tab Selection */}
+        <div style={{
+          display: "flex", gap: "6px", marginBottom: "28px",
+          backgroundColor: "rgba(9, 60, 93, 0.03)", borderRadius: "12px",
+          padding: "4px", border: `1px solid ${theme.border}`,
+          width: "fit-content", flexWrap: "wrap",
         }}>
-          <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${theme.glassBorder}`, cursor: "pointer" }}
-            onClick={() => navigate("/dashboard")}>
-            <RidivoLogo size={34} showText={true} textColor="white" />
-          </div>
-
-          <nav style={{ padding: "16px 12px", flex: 1 }}>
-            {navItems.map((item) => (
-              <button key={item.path} onClick={() => navigate(item.path)} style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "12px",
-                padding: "11px 12px", borderRadius: "10px", border: "none",
-                backgroundColor: item.path === "/profile" ? "rgba(56,189,248,0.15)" : "transparent",
-                color: item.path === "/profile" ? theme.textPrimary : theme.textSecondary,
-                cursor: "pointer", fontSize: "14px",
-                fontWeight: item.path === "/profile" ? "600" : "400",
-                fontFamily: "'DM Sans', sans-serif", textAlign: "left",
-                transition: "all 0.2s ease", marginBottom: "2px",
-                borderLeft: item.path === "/profile" ? `3px solid ${theme.accent}` : "3px solid transparent",
-              }}
-                onMouseEnter={(e) => { if (item.path !== "/profile") { e.currentTarget.style.backgroundColor = theme.glassHover; e.currentTarget.style.color = theme.textPrimary; } }}
-                onMouseLeave={(e) => { if (item.path !== "/profile") { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = theme.textSecondary; } }}
-              >
-                <span style={{ fontSize: "16px", width: "20px", textAlign: "center" }}>{item.icon}</span>
-                {item.label}
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button key={tab.id} onClick={() => { navigate(`/edit-profile?tab=${tab.id}`); setActiveTab(tab.id); }} style={{
+                padding: "10px 18px", borderRadius: "8px", border: "none",
+                backgroundColor: active ? "white" : "transparent",
+                color: active ? theme.textPrimary : theme.textSecondary,
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13.5px", fontWeight: "600",
+                transition: "all 0.2s ease",
+                boxShadow: active ? "0 4px 10px rgba(9, 60, 93, 0.03)" : "none",
+              }}>
+                {tab.label}
               </button>
-            ))}
-          </nav>
+            );
+          })}
+        </div>
 
-          <div style={{ margin: "12px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(2,132,199,0.4))", border: `1px solid rgba(56,189,248,0.3)`, padding: "16px", marginBottom: "20px" }}>
-            <div style={{ fontSize: "20px", marginBottom: "6px" }}>🚗</div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "13px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px" }}>Got Empty Seats?</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: "rgba(255,255,255,0.7)", marginBottom: "12px" }}>Share your ride and split the cost</div>
-            <button style={{ width: "100%", padding: "8px", backgroundColor: theme.accent, color: "#fff", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-              onClick={() => navigate("/offer-ride")}>Offer a Ride</button>
-          </div>
-        </aside>
-
-        {/* ── MAIN CONTENT ── */}
-        <div style={{ marginLeft: "240px", flex: 1, display: "flex", flexDirection: "column" }}>
-
-          {/* Top bar */}
-          <header style={{
-            height: "64px", backgroundColor: theme.glassCardHeavy,
-            backdropFilter: "blur(16px)", borderBottom: `1px solid ${theme.glassBorder}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "0 32px", position: "sticky", top: 0, zIndex: 50,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <button onClick={() => navigate("/profile")} style={{
-                background: "rgba(255,255,255,0.05)", border: `1px solid ${theme.glassBorder}`,
-                borderRadius: "8px", padding: "6px 12px", color: theme.textSecondary,
-                cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
-                display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = theme.textPrimary; e.currentTarget.style.borderColor = theme.accent; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.borderColor = theme.glassBorder; }}
-              >
-                ← Back to Profile
-              </button>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "700", color: theme.textPrimary }}>
-                Edit Profile
-              </div>
+        {/* ── PERSONAL INFO TAB ── */}
+        {activeTab === "personal" && (
+          <SectionCard title="Personal Information" subtitle="Update your general profile name and contact number">
+            <Alert type={personalAlert.type} message={personalAlert.message} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+              <GlassInput label="Full Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter full name" required />
+              <GlassInput label="Email Address" value={email} disabled hint="Email address cannot be changed" />
+              <GlassInput label="Phone Number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" />
             </div>
-            <button onClick={() => { logout(); navigate("/"); }} style={{
-              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
-              borderRadius: "8px", padding: "6px 16px", color: "#FCA5A5",
-              cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
-              fontWeight: "600", transition: "all 0.2s",
-            }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.2)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.1)"}
-            >
-              🚪 Sign Out
-            </button>
-          </header>
-
-          <main style={{ padding: "32px", maxWidth: "900px", width: "100%" }}>
-
-            {/* Tab navigation */}
-            <div style={{
-              display: "flex", gap: "8px", marginBottom: "28px",
-              backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "16px",
-              padding: "6px", border: `1px solid ${theme.glassBorder}`,
-              flexWrap: "wrap",
-            }}>
-              {tabs.map((tab) => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-                  padding: "10px 18px", borderRadius: "10px", border: "none",
-                  backgroundColor: activeTab === tab.id ? `rgba(56,189,248,0.2)` : "transparent",
-                  color: activeTab === tab.id ? theme.accent : theme.textSecondary,
-                  cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "13px", fontWeight: activeTab === tab.id ? "700" : "400",
-                  transition: "all 0.2s ease",
-                  borderBottom: activeTab === tab.id ? `2px solid ${theme.accent}` : "2px solid transparent",
-                }}>
-                  {tab.label}
-                </button>
-              ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+              <SaveButton onClick={handlePersonalSave} loading={personalLoading} />
             </div>
+          </SectionCard>
+        )}
 
-            {/* ── PERSONAL INFO TAB ── */}
-            {activeTab === "personal" && (
-              <>
-                <SectionCard title="Personal Information" subtitle="Update your name and phone number">
-                  <Alert type={personalAlert.type} message={personalAlert.message} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-                    <GlassInput label="Full Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" required />
-                    <GlassInput label="Email Address" value={email} disabled hint="Email cannot be changed" />
-                    <GlassInput label="Phone Number" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" />
+        {/* ── PASSWORD TAB ── */}
+        {activeTab === "password" && (
+          <SectionCard title="Change Password" subtitle="Modify your password. Make sure to use a secure value.">
+            <Alert type={passwordAlert.type} message={passwordAlert.message} />
+            <div style={{ maxWidth: "460px" }}>
+              <GlassInput label="Current Password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Enter old password" required />
+              <GlassInput label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters" required />
+              <GlassInput label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+              <SaveButton onClick={handlePasswordSave} loading={passwordLoading} label="Change Password" />
+            </div>
+          </SectionCard>
+        )}
+
+        {/* ── DRIVER VERIFICATION TAB ── */}
+        {activeTab === "driver" && (
+          <>
+            {verificationStatus && (
+              <div style={{
+                padding: "20px", borderRadius: "16px", marginBottom: "24px",
+                backgroundColor: verificationStatus.status === "APPROVED" ? theme.successBg : verificationStatus.status === "REJECTED" ? theme.dangerBg : theme.warningBg,
+                border: `1px solid ${verificationStatus.status === "APPROVED" ? "rgba(16, 185, 129, 0.15)" : verificationStatus.status === "REJECTED" ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)"}`,
+                display: "flex", alignItems: "center", gap: "14px",
+              }}>
+                <span style={{ fontSize: "28px" }}>
+                  {verificationStatus.status === "APPROVED" ? "✅" : verificationStatus.status === "REJECTED" ? "❌" : "⏳"}
+                </span>
+                <div>
+                  <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: verificationStatus.status === "APPROVED" ? theme.success : verificationStatus.status === "REJECTED" ? theme.danger : theme.warningText }}>
+                    {verificationStatus.status === "APPROVED" ? "Verified Driver!" : verificationStatus.status === "REJECTED" ? "Verification Rejected" : "Verification Pending Admin Audit"}
                   </div>
-                  <SaveButton onClick={handlePersonalSave} loading={personalLoading} />
-                </SectionCard>
-              </>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px", fontWeight: "500" }}>
+                    {verificationStatus.status === "APPROVED" ? "You are fully authorized to offer rides on Ridivo." : verificationStatus.status === "REJECTED" ? verificationStatus.rejection_reason || "Re-submit correct document details." : "Admin is audit-verifying your details. Typically resolves within 24 hours."}
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* ── PASSWORD TAB ── */}
-            {activeTab === "password" && (
-              <SectionCard title="Change Password" subtitle="Make sure your new password is at least 6 characters">
-                <Alert type={passwordAlert.type} message={passwordAlert.message} />
-                <div style={{ maxWidth: "460px" }}>
-                  <GlassInput label="Current Password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Enter current password" required />
-                  <GlassInput label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Enter new password" required />
-                  <GlassInput label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required />
+            {(!verificationStatus || verificationStatus.status === "REJECTED") && (
+              <SectionCard title="Submit Identity Verification" subtitle="Provide documents to verify driving credentials">
+                <Alert type={verifyAlert.type} message={verifyAlert.message} />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+                  <GlassInput label="License Number" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="e.g. MP09 2023 1234567" required />
+                  <GlassInput label="License Expiry Date" type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} required />
+                  <GlassInput label="License Front Image URL" value={licenseImageUrl} onChange={(e) => setLicenseImageUrl(e.target.value)} placeholder="https://..." hint="Upload license image and paste URL link" />
+                  <GlassInput label="Aadhar Card Number" value={aadharNumber} onChange={(e) => setAadharNumber(e.target.value)} placeholder="12 digit Aadhaar number" required />
+                  <GlassInput label="Aadhar Front Image URL" value={aadharImageUrl} onChange={(e) => setAadharImageUrl(e.target.value)} placeholder="https://..." hint="Upload Aadhaar image and paste URL link" />
                 </div>
-                <SaveButton onClick={handlePasswordSave} loading={passwordLoading} label="Change Password" />
+
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+                  <SaveButton onClick={handleVerificationSubmit} loading={verifyLoading} label="Submit Documents" />
+                </div>
+              </SectionCard>
+            )}
+          </>
+        )}
+
+        {/* ── VEHICLES TAB ── */}
+        {activeTab === "vehicles" && (
+          <>
+            {vehicles.length > 0 && (
+              <SectionCard title="Registered Vehicles" subtitle="Your vehicles registered on the platform">
+                {vehicles.map((v) => (
+                  <div key={v.id} style={{
+                    display: "flex", alignItems: "center", gap: "16px",
+                    padding: "16px 18px", borderRadius: "14px", marginBottom: "12px",
+                    backgroundColor: "#F9FAFB", border: `1px solid ${v.is_active ? "rgba(9, 60, 93, 0.2)" : theme.border}`,
+                  }}>
+                    <div style={{ width: "44px", height: "44px", borderRadius: "10px", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary }}>
+                      {v.vehicle_type === "BIKE" ? <Bike size={20} /> : <Car size={20} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, marginBottom: "3px" }}>
+                        {v.vehicle_name}
+                        {v.is_active && <span style={{ marginLeft: "8px", fontSize: "10px", backgroundColor: theme.successBg, color: theme.success, padding: "2px 8px", borderRadius: "100px", fontWeight: "700" }}>ACTIVE</span>}
+                      </div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>
+                        {v.vehicle_number} · {v.vehicle_type} · {v.total_seats} passenger seats {v.color ? `· ${v.color}` : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      {!v.is_active && (
+                        <button onClick={() => handleSetActive(v.id)} style={{
+                          padding: "6px 12px", backgroundColor: "white", border: `1px solid ${theme.border}`,
+                          borderRadius: "8px", color: theme.textPrimary, cursor: "pointer",
+                          fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "700",
+                        }}>Set Active</button>
+                      )}
+                      <button onClick={() => handleDeleteVehicle(v.id)} style={{
+                        padding: "6px 12px", backgroundColor: theme.dangerBg, border: "none",
+                        borderRadius: "8px", color: theme.danger, cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "700",
+                        display: "flex", alignItems: "center", gap: "4px"
+                      }}>
+                        <Trash2 size={12} /> Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </SectionCard>
             )}
 
-            {/* ── DRIVER VERIFICATION TAB ── */}
-            {activeTab === "driver" && (
-              <>
-                {/* Status banner */}
-                {verificationStatus && (
-                  <div style={{
-                    padding: "16px 20px", borderRadius: "14px", marginBottom: "20px",
-                    backgroundColor: verificationStatus.status === "APPROVED" ? "rgba(52,211,153,0.1)" : verificationStatus.status === "REJECTED" ? "rgba(239,68,68,0.1)" : "rgba(251,191,36,0.1)",
-                    border: `1px solid ${verificationStatus.status === "APPROVED" ? "rgba(52,211,153,0.3)" : verificationStatus.status === "REJECTED" ? "rgba(239,68,68,0.3)" : "rgba(251,191,36,0.3)"}`,
-                    display: "flex", alignItems: "center", gap: "14px",
-                  }}>
-                    <span style={{ fontSize: "28px" }}>
-                      {verificationStatus.status === "APPROVED" ? "✅" : verificationStatus.status === "REJECTED" ? "❌" : "⏳"}
-                    </span>
-                    <div>
-                      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: verificationStatus.status === "APPROVED" ? theme.successText : verificationStatus.status === "REJECTED" ? theme.errorText : theme.warningText }}>
-                        {verificationStatus.status === "APPROVED" ? "Verified Driver ✓" : verificationStatus.status === "REJECTED" ? "Verification Rejected" : "Verification Pending"}
-                      </div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary, marginTop: "3px" }}>
-                        {verificationStatus.status === "APPROVED" ? "You can now offer rides on Ridivo" : verificationStatus.status === "REJECTED" ? verificationStatus.rejection_reason || "Please reapply with correct documents" : "Admin is reviewing your documents. This may take up to 24 hours."}
-                      </div>
-                    </div>
+            {/* Add vehicle form */}
+            <SectionCard
+              title="Add New Vehicle"
+              subtitle={verificationStatus?.status !== "APPROVED" ? "Verification is required to add vehicles." : "Register a vehicle for offering rides."}
+            >
+              {verificationStatus?.status !== "APPROVED" && (
+                <div style={{ textAlign: "center", padding: "24px 0" }}>
+                  <ShieldCheck size={40} style={{ color: theme.textSecondary, marginBottom: "12px" }} />
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "14px", color: theme.textSecondary, marginBottom: "16px", fontWeight: "500" }}>
+                    Driver verification approval is required to register vehicles.
                   </div>
-                )}
+                  <button onClick={() => setActiveTab("driver")} style={{
+                    padding: "10px 20px", backgroundColor: theme.accentLight,
+                    border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: "10px",
+                    color: theme.textPrimary, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "13px", fontWeight: "700",
+                  }}>Verify Credentials →</button>
+                </div>
+              )}
 
-                {/* Show form only if not approved or rejected */}
-                {(!verificationStatus || verificationStatus.status === "REJECTED") && (
-                  <SectionCard title="Driver Verification" subtitle="Submit your documents to start offering rides">
-                    <Alert type={verifyAlert.type} message={verifyAlert.message} />
-
-                    <div style={{ marginBottom: "20px", padding: "14px 16px", backgroundColor: "rgba(56,189,248,0.05)", borderRadius: "10px", border: `1px solid rgba(56,189,248,0.15)` }}>
-                      <div style={{ fontSize: "12px", color: theme.accent, fontWeight: "600", marginBottom: "4px", fontFamily: "'DM Sans', sans-serif" }}>📋 Required Documents</div>
-                      <div style={{ fontSize: "12px", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", lineHeight: "1.6" }}>
-                        Valid Driving License · Aadhaar Card · Both documents must match your registered name
-                      </div>
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-                      <GlassInput label="License Number" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="e.g. MP09 2023 1234567" required />
-                      <GlassInput label="License Expiry Date" type="date" value={licenseExpiry} onChange={(e) => setLicenseExpiry(e.target.value)} required />
-                      <GlassInput label="License Image URL" value={licenseImageUrl} onChange={(e) => setLicenseImageUrl(e.target.value)} placeholder="https://..." hint="Upload image to cloud and paste URL" />
-                      <GlassInput label="Aadhar Number" value={aadharNumber} onChange={(e) => setAadharNumber(e.target.value)} placeholder="12 digit Aadhar number" required />
-                      <GlassInput label="Aadhar Image URL" value={aadharImageUrl} onChange={(e) => setAadharImageUrl(e.target.value)} placeholder="https://..." hint="Upload image to cloud and paste URL" />
-                    </div>
-
-                    <SaveButton onClick={handleVerificationSubmit} loading={verifyLoading} label="Submit for Verification" />
-                  </SectionCard>
-                )}
-              </>
-            )}
-
-            {/* ── VEHICLES TAB ── */}
-            {activeTab === "vehicles" && (
-              <>
-                {/* Existing vehicles */}
-                {vehicles.length > 0 && (
-                  <SectionCard title="My Vehicles" subtitle="Manage your registered vehicles">
-                    {vehicles.map((v) => (
-                      <div key={v.id} style={{
-                        display: "flex", alignItems: "center", gap: "16px",
-                        padding: "16px", borderRadius: "12px", marginBottom: "12px",
-                        backgroundColor: "rgba(0,0,0,0.2)", border: `1px solid ${v.is_active ? "rgba(56,189,248,0.3)" : theme.glassBorder}`,
-                      }}>
-                        <div style={{ width: "48px", height: "48px", borderRadius: "12px", backgroundColor: "rgba(56,189,248,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0 }}>
-                          {v.vehicle_type === "BIKE" ? "🏍️" : v.vehicle_type === "SUV" ? "🚙" : "🚗"}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, marginBottom: "3px" }}>
-                            {v.vehicle_name}
-                            {v.is_active && <span style={{ marginLeft: "8px", fontSize: "10px", backgroundColor: "rgba(56,189,248,0.2)", color: theme.accent, padding: "2px 8px", borderRadius: "100px", fontWeight: "600" }}>ACTIVE</span>}
-                          </div>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>
-                            {v.vehicle_number} · {v.vehicle_type} · {v.total_seats} seats · {v.color || "No color"}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          {!v.is_active && (
-                            <button onClick={() => handleSetActive(v.id)} style={{
-                              padding: "6px 12px", backgroundColor: "rgba(56,189,248,0.1)", border: `1px solid rgba(56,189,248,0.3)`,
-                              borderRadius: "8px", color: theme.accent, cursor: "pointer",
-                              fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "600",
-                            }}>Set Active</button>
-                          )}
-                          <button onClick={() => handleDeleteVehicle(v.id)} style={{
-                            padding: "6px 12px", backgroundColor: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
-                            borderRadius: "8px", color: theme.errorText, cursor: "pointer",
-                            fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "600",
-                          }}>Remove</button>
-                        </div>
-                      </div>
-                    ))}
-                  </SectionCard>
-                )}
-
-                {/* Add new vehicle */}
-                <SectionCard
-                  title="Add New Vehicle"
-                  subtitle={verificationStatus?.status !== "APPROVED" ? "⚠️ You must be a verified driver to add vehicles" : "Register a new vehicle to your account"}
-                >
-                  {verificationStatus?.status !== "APPROVED" && (
-                    <div style={{ textAlign: "center", padding: "24px 0" }}>
-                      <div style={{ fontSize: "40px", marginBottom: "12px" }}>🛡️</div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "14px", color: theme.textSecondary, marginBottom: "16px" }}>
-                        Complete driver verification first to add vehicles
-                      </div>
-                      <button onClick={() => setActiveTab("driver")} style={{
-                        padding: "10px 20px", backgroundColor: `rgba(56,189,248,0.15)`,
-                        border: `1px solid rgba(56,189,248,0.3)`, borderRadius: "10px",
-                        color: theme.accent, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-                        fontSize: "13px", fontWeight: "600",
-                      }}>Go to Driver Verification →</button>
-                    </div>
-                  )}
-
-                  {verificationStatus?.status === "APPROVED" && (
-                    <>
-                      <Alert type={vehicleAlert.type} message={vehicleAlert.message} />
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-                        <GlassInput label="Vehicle Name" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} placeholder="e.g. Swift Dzire" required />
-                        <GlassInput label="Vehicle Number" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="e.g. MP09 AB 1234" required />
-                        <GlassSelect label="Vehicle Type" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} options={[{ value: "CAR", label: "🚗 Car" }, { value: "SUV", label: "🚙 SUV" }, { value: "BIKE", label: "🏍️ Bike" }]} required />
-                        <GlassInput label="Total Seats" type="number" value={totalSeats} onChange={(e) => setTotalSeats(e.target.value)} placeholder="e.g. 4" hint="Excluding driver" required />
-                        <GlassInput label="Color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="e.g. White" />
-                        <GlassInput label="Vehicle Image URL" value={vehicleImageUrl} onChange={(e) => setVehicleImageUrl(e.target.value)} placeholder="https://..." hint="Optional — upload and paste URL" />
-                      </div>
-                      <SaveButton onClick={handleAddVehicle} loading={vehicleLoading} label="Add Vehicle" />
-                    </>
-                  )}
-                </SectionCard>
-              </>
-            )}
-          </main>
-        </div>
+              {verificationStatus?.status === "APPROVED" && (
+                <>
+                  <Alert type={vehicleAlert.type} message={vehicleAlert.message} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+                    <GlassInput label="Vehicle Model Name" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} placeholder="e.g. Swift Dzire" required />
+                    <GlassInput label="Vehicle Plate Number" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="e.g. MP09 AB 1234" required />
+                    <GlassSelect label="Vehicle Category" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} options={[{ value: "CAR", label: "Car" }, { value: "SUV", label: "SUV" }, { value: "BIKE", label: "Bike" }]} required />
+                    <GlassInput label="Passenger Seats" type="number" value={totalSeats} onChange={(e) => setTotalSeats(e.target.value)} placeholder="e.g. 4" hint="Excluding driver" required />
+                    <GlassInput label="Vehicle Color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="e.g. White" />
+                    <GlassInput label="Vehicle Image Link" value={vehicleImageUrl} onChange={(e) => setVehicleImageUrl(e.target.value)} placeholder="https://..." hint="Optional — image URL address" />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+                    <SaveButton onClick={handleAddVehicle} loading={vehicleLoading} label="Register Vehicle" />
+                  </div>
+                </>
+              )}
+            </SectionCard>
+          </>
+        )}
       </div>
-
-      <style>{`
-        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.5); }
-        select option { background: #0B1120; color: #F8FAFC; }
-      `}</style>
     </>
   );
 }

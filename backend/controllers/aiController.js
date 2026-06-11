@@ -1,9 +1,5 @@
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
-
 export const suggestPrice = async (req, res) => {
     try {
         const { origin, destination } = req.body;
@@ -11,6 +7,22 @@ export const suggestPrice = async (req, res) => {
         if (!origin || !destination) {
             return res.status(400).json({ message: 'origin and destination required' });
         }
+
+        if (!process.env.GROQ_API_KEY) {
+            console.warn('WARNING: GROQ_API_KEY is missing. Returning fallback mock suggestion.');
+            return res.status(200).json({
+                distance: "150 km",
+                petrol_cost: "₹1,050",
+                toll_cost: "₹180",
+                suggested_total: "₹1,230",
+                raw_total: 1230,
+                explanation: "Calculation based on standard estimation (GROQ_API_KEY is not configured)."
+            });
+        }
+
+        const groq = new Groq({
+            apiKey: process.env.GROQ_API_KEY,
+        });
 
         const completion = await groq.chat.completions.create({
             model: 'llama-3.1-8b-instant',
