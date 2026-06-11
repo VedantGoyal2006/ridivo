@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getMyProfile, updateMyProfile } from "../services/userService";
+import { getMyProfile, updateMyProfile, getEmergencyContacts, addEmergencyContact, updateEmergencyContact, deleteEmergencyContact } from "../services/userService";
 import axiosInstance from "../utils/axiosInstance";
 import {
   Calendar,
@@ -160,7 +160,7 @@ export default function ProfilePage() {
   const getInitialTab = () => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    return ["overview", "reviews", "settings"].includes(tab) ? tab : "overview";
+    return ["overview", "reviews", "emergency-contacts", "settings"].includes(tab) ? tab : "overview";
   };
 
   const [user, setUser] = useState(null);
@@ -168,13 +168,40 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [editOpen, setEditOpen] = useState(false);
 
+  // Emergency Contacts state variables
+  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [fetchingContacts, setFetchingContacts] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
+  const [contactForm, setContactForm] = useState({ name: "", relationship: "Parent", phone: "" });
+  const [formError, setFormError] = useState("");
+  const [formSaving, setFormSaving] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    if (tab && ["overview", "reviews", "settings"].includes(tab)) {
+    if (tab && ["overview", "reviews", "emergency-contacts", "settings"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  // Fetch emergency contacts when switching to the tab
+  useEffect(() => {
+    if (activeTab === "emergency-contacts") {
+      const fetchContacts = async () => {
+        setFetchingContacts(true);
+        try {
+          const res = await getEmergencyContacts();
+          setEmergencyContacts(res.contacts || []);
+        } catch (err) {
+          console.error("Failed to fetch emergency contacts:", err);
+        } finally {
+          setFetchingContacts(false);
+        }
+      };
+      fetchContacts();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -219,6 +246,48 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSaveContact = async () => {
+    if (!contactForm.name.trim()) {
+      setFormError("Full Name is required.");
+      return;
+    }
+    if (!contactForm.phone.trim()) {
+      setFormError("Phone Number is required.");
+      return;
+    }
+    if (!/^\+?[1-9]\d{7,14}$/.test(contactForm.phone.trim())) {
+      setFormError("Invalid phone number format. Must be 8 to 15 digits (e.g. +919876543210).");
+      return;
+    }
+
+    setFormSaving(true);
+    setFormError("");
+    try {
+      if (editingContact) {
+        const res = await updateEmergencyContact(editingContact.id, contactForm);
+        setEmergencyContacts(emergencyContacts.map((c) => (c.id === editingContact.id ? res.contact : c)));
+      } else {
+        const res = await addEmergencyContact(contactForm);
+        setEmergencyContacts([...emergencyContacts, res.contact]);
+      }
+      setFormOpen(false);
+    } catch (err) {
+      setFormError(err.response?.data?.message || "Failed to save contact.");
+    } finally {
+      setFormSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this emergency contact?")) return;
+    try {
+      await deleteEmergencyContact(id);
+      setEmergencyContacts(emergencyContacts.filter((c) => c.id !== id));
+    } catch (err) {
+      alert("Failed to delete contact.");
+    }
+  };
+
   const memberSince = user
     ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
     : "";
@@ -227,6 +296,7 @@ export default function ProfilePage() {
     ? [
         { id: "overview", label: "Overview" },
         { id: "reviews", label: `Reviews (${user.reviews.length})` },
+        { id: "emergency-contacts", label: "Emergency Contacts" },
         { id: "settings", label: "Settings" },
       ]
     : [];
@@ -518,6 +588,158 @@ export default function ProfilePage() {
           </>
         )}
 
+        {/* Tab: Emergency Contacts */}
+        {activeTab === "emergency-contacts" && (
+          <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px" }}>Emergency Contacts</div>
+                <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px" }}>Manage up to 5 trusted contacts for instant SOS ride safety alerts.</div>
+              </div>
+              {emergencyContacts.length < 5 && (
+                <button
+                  onClick={() => {
+                    setEditingContact(null);
+                    setContactForm({ name: "", relationship: "Parent", phone: "" });
+                    setFormError("");
+                    setFormOpen(true);
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    backgroundColor: theme.textPrimary,
+                    color: "white",
+                    border: "none",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#07304b"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.textPrimary}
+                >
+                  <Plus size={14} /> Add Contact
+                </button>
+              )}
+            </div>
+
+            {fetchingContacts ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
+                Loading contacts...
+              </div>
+            ) : emergencyContacts.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px 20px", color: theme.textSecondary, border: `1px dashed ${theme.border}`, borderRadius: "12px", backgroundColor: "#F9FAFB" }}>
+                <div style={{ fontSize: "32px", marginBottom: "12px" }}>🛡️</div>
+                <div style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px", fontFamily: "'Sora', sans-serif" }}>No Emergency Contacts Saved</div>
+                <div style={{ fontSize: "12.5px", maxWidth: "340px", margin: "0 auto 16px", lineHeight: "1.5" }}>Add trusted friends, family, or relatives so we can alert them instantly in case of an emergency.</div>
+                <button
+                  onClick={() => {
+                    setEditingContact(null);
+                    setContactForm({ name: "", relationship: "Parent", phone: "" });
+                    setFormError("");
+                    setFormOpen(true);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: theme.textPrimary,
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "12.5px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif"
+                  }}
+                >
+                  Add First Contact
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
+                {emergencyContacts.map((contact) => (
+                  <div key={contact.id} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "16px 20px",
+                    backgroundColor: "#F9FAFB",
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "12px",
+                    transition: "all 0.2s"
+                  }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.boxShadow = "0 4px 12px rgba(9, 60, 93, 0.02)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.boxShadow = "none"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{
+                        width: "42px", height: "42px", borderRadius: "50%",
+                        backgroundColor: theme.accentLight, display: "flex",
+                        alignItems: "center", justifyContent: "center", color: theme.textPrimary,
+                        fontSize: "16px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif"
+                      }}>
+                        {contact.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif" }}>{contact.name}</span>
+                          <span style={{
+                            fontSize: "10.5px",
+                            fontWeight: "700",
+                            backgroundColor: "rgba(9, 60, 93, 0.06)",
+                            color: theme.textPrimary,
+                            padding: "2px 8px",
+                            borderRadius: "100px",
+                            textTransform: "uppercase"
+                          }}>{contact.relationship}</span>
+                        </div>
+                        <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Phone size={11} /> {contact.phone}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => {
+                          setEditingContact(contact);
+                          setContactForm({ name: contact.name, relationship: contact.relationship, phone: contact.phone });
+                          setFormError("");
+                          setFormOpen(true);
+                        }}
+                        style={{
+                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
+                          backgroundColor: "white", color: theme.textSecondary, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.color = theme.textPrimary; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; }}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContact(contact.id)}
+                        style={{
+                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
+                          backgroundColor: "white", color: theme.danger, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tab: Reviews */}
         {activeTab === "reviews" && (
           <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
@@ -601,6 +823,94 @@ export default function ProfilePage() {
       </div>
 
       {editOpen && <EditModal user={user} onClose={() => setEditOpen(false)} onSave={handleSave} />}
+
+      {formOpen && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9, 60, 93, 0.4)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 32,
+            width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)",
+            fontFamily: "'DM Sans', sans-serif"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h3 style={{ color: theme.textPrimary, fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Sora', sans-serif" }}>
+                {editingContact ? "Edit Contact" : "Add Emergency Contact"}
+              </h3>
+              <button onClick={() => setFormOpen(false)} style={{ background: "none", border: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            {formError && (
+              <div style={{
+                backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`,
+                padding: "10px 14px", borderRadius: 8, fontSize: "12.5px", fontWeight: "600", marginBottom: 16
+              }}>
+                ⚠️ {formError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Full Name</label>
+              <input
+                value={contactForm.name}
+                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                placeholder="e.g. John Doe"
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Relationship</label>
+              <select
+                value={contactForm.relationship}
+                onChange={(e) => setContactForm({ ...contactForm, relationship: e.target.value })}
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box", cursor: "pointer"
+                }}
+              >
+                {["Parent", "Spouse", "Sibling", "Child", "Friend", "Other"].map((rel) => (
+                  <option key={rel} value={rel}>{rel}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Phone Number</label>
+              <input
+                value={contactForm.phone}
+                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                placeholder="e.g. +919876543210"
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button onClick={() => setFormOpen(false)} style={{
+                flex: 1, padding: "12px 0", borderRadius: 8, border: `1px solid ${theme.border}`,
+                background: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 14, fontWeight: "600"
+              }}>Cancel</button>
+              <button onClick={handleSaveContact} disabled={formSaving} style={{
+                flex: 1, padding: "12px 0", borderRadius: 8, border: "none",
+                background: formSaving ? theme.accent : theme.textPrimary, color: "#fff",
+                cursor: formSaving ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600
+              }}>
+                {formSaving ? "Saving..." : "Save Contact"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

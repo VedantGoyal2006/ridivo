@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { getMyBookings, getMyRides } from '../services/rideService';
+import { getMyBookings, getMyRides, triggerSOS } from '../services/rideService';
 import {
   Luggage,
   Car,
@@ -175,7 +175,7 @@ function SearchSection() {
 }
 
 // ── UPCOMING RIDES ────────────────────────────────────────────────────────────
-function UpcomingRides({ bookings }) {
+function UpcomingRides({ bookings, onSOS }) {
   const navigate = useNavigate();
   const upcoming = bookings.filter(b => ['PENDING', 'CONFIRMED'].includes(b.status));
 
@@ -240,13 +240,35 @@ function UpcomingRides({ bookings }) {
 
           <div style={{ textAlign: "right" }}>
             <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "800", color: theme.textPrimary, marginBottom: "4px" }}>₹{booking.total_fare}</div>
-            <div style={{
-              display: "inline-block", padding: "3px 10px", borderRadius: "100px",
-              backgroundColor: booking.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
-              color: booking.status === "CONFIRMED" ? theme.successText : theme.warningText,
-              fontSize: "10px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
-              border: `1px solid ${booking.status === "CONFIRMED" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
-            }}>{booking.status}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+              <div style={{
+                display: "inline-block", padding: "3px 10px", borderRadius: "100px",
+                backgroundColor: booking.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
+                color: booking.status === "CONFIRMED" ? theme.successText : theme.warningText,
+                fontSize: "10px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
+                border: `1px solid ${booking.status === "CONFIRMED" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
+              }}>{booking.status}</div>
+
+              {booking.status === 'CONFIRMED' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSOS(booking);
+                  }}
+                  style={{
+                    padding: "3px 8px", borderRadius: "6px",
+                    backgroundColor: theme.dangerBg, color: theme.danger,
+                    border: `1px solid rgba(239, 68, 68, 0.2)`,
+                    fontSize: "10px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
+                    cursor: "pointer", transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.dangerBg}
+                >
+                  🚨 SOS Alert
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -255,8 +277,44 @@ function UpcomingRides({ bookings }) {
 }
 
 // ── RECENT ACTIVITY ───────────────────────────────────────────────────────────
-function RecentActivity({ bookings }) {
-  const recent = bookings.slice(0, 4);
+function RecentActivity({ bookings = [], rides = [] }) {
+  const navigate = useNavigate();
+
+  const combined = [
+    ...bookings.map(b => ({
+      id: b.id,
+      origin: b.origin,
+      destination: b.destination,
+      created_at: b.created_at,
+      status: b.status,
+      fare: b.total_fare,
+      type: 'BOOKING',
+    })),
+    ...rides.map(r => {
+      const bookedSeats = r.total_seats - r.available_seats;
+      return {
+        id: r.id,
+        origin: r.origin,
+        destination: r.destination,
+        created_at: r.created_at,
+        status: r.status,
+        fare: parseFloat(r.total_trip_cost) || (parseFloat(r.price_per_seat) * r.total_seats),
+        type: 'RIDE_OFFER',
+        bookedSeats,
+        totalSeats: r.total_seats
+      };
+    })
+  ];
+
+  const recent = combined
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
+
+  const getStatusColor = (status) => {
+    if (['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(status)) return theme.success;
+    if (['PENDING', 'ONGOING'].includes(status)) return theme.warningText || '#D97706';
+    return theme.danger;
+  };
 
   return (
     <div style={{ backgroundColor: theme.bgCard, borderRadius: "20px", border: `1px solid ${theme.border}`, overflow: "hidden", boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)" }}>
@@ -268,32 +326,72 @@ function RecentActivity({ bookings }) {
         <div style={{ padding: '24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
           No recent activity
         </div>
-      ) : recent.map((booking, i) => (
-        <div key={booking.id} style={{
-          padding: "14px 24px", display: "flex", alignItems: "center", gap: "14px",
-          borderBottom: i < recent.length - 1 ? `1px solid ${theme.border}` : "none",
-          transition: "background 0.2s",
-        }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.accentLight}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-        >
-          <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: theme.bgBase, border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary, flexShrink: 0 }}>
-            <Luggage size={16} />
+      ) : (
+        <>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {recent.map((activity, i) => {
+              const isBooking = activity.type === 'BOOKING';
+              return (
+                <div 
+                  key={activity.id} 
+                  onClick={() => navigate(isBooking ? '/bookings?tab=my' : '/bookings?tab=driver')}
+                  style={{
+                    padding: "14px 24px", display: "flex", alignItems: "center", gap: "14px",
+                    borderBottom: i < recent.length - 1 ? `1px solid ${theme.border}` : "none",
+                    transition: "all 0.2s ease",
+                    cursor: "pointer"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.accentLight}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: theme.bgBase, border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary, flexShrink: 0 }}>
+                    {isBooking ? <Luggage size={16} /> : <Car size={16} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>
+                      {activity.origin} → {activity.destination}
+                    </div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>
+                      {new Date(activity.created_at).toLocaleDateString()} · {
+                        isBooking 
+                          ? `Booking request ${activity.status.toLowerCase()}` 
+                          : `Offered ride (${activity.status.toLowerCase()})`
+                      }
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "800", color: theme.textPrimary }}>₹{activity.fare}</div>
+                    <div style={{ 
+                      fontFamily: "'DM Sans', sans-serif", 
+                      fontSize: "11px", 
+                      color: isBooking ? getStatusColor(activity.status) : theme.accent, 
+                      fontWeight: "600" 
+                    }}>
+                      {isBooking ? activity.status : `${activity.bookedSeats}/${activity.totalSeats} booked`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>
-              {booking.origin} → {booking.destination}
+          {combined.length > 5 && (
+            <div style={{ padding: "12px 24px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", backgroundColor: "#FCFDFE" }}>
+              <button 
+                onClick={() => navigate('/bookings?tab=my')}
+                style={{ background: "none", border: "none", color: theme.accent, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Show More Bookings →
+              </button>
+              <button 
+                onClick={() => navigate('/bookings?tab=driver')}
+                style={{ background: "none", border: "none", color: theme.accent, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Show More Ride Requests →
+              </button>
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>
-              {new Date(booking.created_at).toLocaleDateString()} · Booking request {booking.status.toLowerCase()}
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "800", color: theme.textPrimary }}>₹{booking.total_fare}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: booking.status === 'CONFIRMED' ? theme.successText : theme.warningText, fontWeight: "600" }}>{booking.status}</div>
-          </div>
-        </div>
-      ))}
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -389,6 +487,39 @@ export default function Dashboard() {
     ridesOffered: 0,
   });
 
+  // SOS State Variables
+  const [sosBooking, setSosBooking] = useState(null);
+  const [sosConfirmOpen, setSosConfirmOpen] = useState(false);
+  const [sosLoading, setSosLoading] = useState(false);
+  const [sosAlertText, setSosAlertText] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleSOS = (booking) => {
+      setSosBooking(booking);
+      setSosConfirmOpen(true);
+      setSosAlertText('');
+      setError('');
+      setSuccess('');
+  };
+
+  const confirmSOS = async () => {
+      if (!sosBooking) return;
+      setSosLoading(true);
+      setError('');
+      setSuccess('');
+      try {
+          const data = await triggerSOS(sosBooking.id);
+          setSosAlertText(data.alertText);
+          setSuccess(data.message);
+      } catch (err) {
+          setError(err.response?.data?.message || 'Failed to dispatch SOS alert.');
+      } finally {
+          setSosLoading(false);
+          setSosConfirmOpen(false);
+      }
+  };
+
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
     if (user) {
@@ -444,12 +575,111 @@ export default function Dashboard() {
         {/* Bottom grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "24px" }}>
           <div>
-            <UpcomingRides bookings={myBookings} />
-            <RecentActivity bookings={myBookings} />
+            <UpcomingRides bookings={myBookings} onSOS={handleSOS} />
+            <RecentActivity bookings={myBookings} rides={myRides} />
           </div>
           <RightPanel user={user} navigate={navigate} />
         </div>
       </div>
+
+      {/* SOS Confirmation Modal */}
+      {sosConfirmOpen && (
+          <div style={{
+              position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+              backdropFilter: 'blur(4px)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+              <div style={{
+                  backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                  borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '440px',
+                  boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+              }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '24px' }}>🚨</div>
+                      <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: 0 }}>
+                          Confirm SOS Emergency Alert
+                      </h3>
+                  </div>
+                  <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                      Are you sure you want to send an emergency alert to your trusted contacts? This will instantly compile and dispatch your current passenger, driver, vehicle, and trip route details via simulated SMS.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                          onClick={() => setSosConfirmOpen(false)}
+                          style={{
+                              flex: 1, padding: '12px', border: `1px solid ${theme.border}`,
+                              backgroundColor: 'white', color: theme.textSecondary,
+                              borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer'
+                          }}
+                      >
+                          Cancel
+                      </button>
+                      <button
+                          onClick={confirmSOS}
+                          disabled={sosLoading}
+                          style={{
+                              flex: 1, padding: '12px', border: 'none',
+                              backgroundColor: theme.danger, color: 'white',
+                              borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                          }}
+                      >
+                          {sosLoading ? 'Sending Alert...' : 'Send Alert'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* SOS Success & Alert Text Modal */}
+      {sosAlertText && (
+          <div style={{
+              position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+              backdropFilter: 'blur(4px)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+              <div style={{
+                  backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                  borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '500px',
+                  boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+              }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '24px' }}>✅</div>
+                      <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.success, margin: 0 }}>
+                          Emergency Alert Dispatched
+                      </h3>
+                  </div>
+                  {error && (
+                      <div style={{
+                          backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`,
+                          padding: "10px 14px", borderRadius: 8, fontSize: "12.5px", fontWeight: "600", marginBottom: 16
+                      }}>
+                          ⚠️ {error}
+                      </div>
+                  )}
+                  <p style={{ color: theme.textSecondary, fontSize: '14.5px', lineHeight: '1.6', marginBottom: '16px' }}>
+                      Your emergency contacts have been notified with the following trip safety information:
+                  </p>
+                  <div style={{
+                      backgroundColor: '#F9FAFB', border: `1px solid ${theme.border}`,
+                      borderRadius: '10px', padding: '16px', whiteSpace: 'pre-wrap',
+                      fontSize: '12.5px', fontFamily: 'monospace', color: theme.textPrimary,
+                      maxHeight: '220px', overflowY: 'auto', marginBottom: '24px'
+                  }}>
+                      {sosAlertText}
+                  </div>
+                  <button
+                      onClick={() => setSosAlertText('')}
+                      style={{
+                          width: '100%', padding: '12px', border: 'none',
+                          backgroundColor: theme.textPrimary, color: 'white',
+                          borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                      }}
+                  >
+                      Close Window
+                  </button>
+              </div>
+          </div>
+      )}
     </>
   );
 }

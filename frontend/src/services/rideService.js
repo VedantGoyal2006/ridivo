@@ -75,3 +75,9 @@ export const cancelRide = async (id) => {
     const response = await axiosInstance.delete(`/rides/${id}`);
     return response.data;
 };
+
+// Trigger Emergency SOS alert (as passenger)
+export const triggerSOS = async (bookingId) => {
+    const response = await axiosInstance.post(`/bookings/${bookingId}/sos`);
+    return response.data;
+};

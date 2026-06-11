@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     getMyBookings,
     getMyRides,
     getBookingsForRide,
     acceptBooking,
     rejectBooking,
-    cancelBooking
+    cancelBooking,
+    triggerSOS
 } from '../services/rideService';
 import {
   CheckCircle,
@@ -55,7 +56,7 @@ const statusConfig = (status) => {
     return map[status] || { color: theme.textSecondary, bg: '#F3F4F6', icon: AlertCircle };
 };
 
-function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }) {
+function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject, onSOS }) {
     const status = statusConfig(booking.status);
     const StatusIcon = status.icon;
     const [hovered, setHovered] = useState(false);
@@ -232,24 +233,46 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
 
                     {/* Traveler cancel */}
                     {!isDriver && ['PENDING', 'CONFIRMED'].includes(booking.status) && (
-                        <button
-                            onClick={() => onCancel(booking.id)}
-                            style={{
-                                padding: '9px 18px',
-                                backgroundColor: 'transparent',
-                                color: theme.textSecondary,
-                                border: `1px solid ${theme.border}`,
-                                borderRadius: '8px',
-                                fontSize: '12.5px', fontWeight: '600',
-                                cursor: 'pointer',
-                                fontFamily: "'DM Sans', sans-serif",
-                                transition: 'all 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.color = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.backgroundColor = "transparent"; }}
-                        >
-                            Cancel Booking
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            {booking.status === 'CONFIRMED' && (
+                                <button
+                                    onClick={() => onSOS(booking)}
+                                    style={{
+                                        padding: '9px 18px',
+                                        backgroundColor: theme.dangerBg,
+                                        color: theme.danger,
+                                        border: `1px solid rgba(239, 68, 68, 0.2)`,
+                                        borderRadius: '8px',
+                                        fontSize: '12.5px', fontWeight: '700',
+                                        cursor: 'pointer',
+                                        fontFamily: "'DM Sans', sans-serif",
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                                >
+                                    🚨 Emergency SOS
+                                </button>
+                            )}
+                            <button
+                                onClick={() => onCancel(booking.id)}
+                                style={{
+                                    padding: '9px 18px',
+                                    backgroundColor: 'transparent',
+                                    color: theme.textSecondary,
+                                    border: `1px solid ${theme.border}`,
+                                    borderRadius: '8px',
+                                    fontSize: '12.5px', fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontFamily: "'DM Sans', sans-serif",
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.color = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >
+                                Cancel Booking
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -260,15 +283,54 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
 export default function BookingsPage() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const defaultTab = params.get('tab') || 'my';
 
     const [myBookings, setMyBookings] = useState([]);
     const [myRides, setMyRides] = useState([]);
     const [rideBookings, setRideBookings] = useState([]);
     const [selectedRide, setSelectedRide] = useState(null);
-    const [activeTab, setActiveTab] = useState('my');
+    const [activeTab, setActiveTab] = useState(defaultTab);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // SOS State Variables
+    const [sosBooking, setSosBooking] = useState(null);
+    const [sosConfirmOpen, setSosConfirmOpen] = useState(false);
+    const [sosLoading, setSosLoading] = useState(false);
+    const [sosAlertText, setSosAlertText] = useState('');
+
+    const handleSOS = (booking) => {
+        setSosBooking(booking);
+        setSosConfirmOpen(true);
+        setSosAlertText('');
+        setError('');
+        setSuccess('');
+    };
+
+    const confirmSOS = async () => {
+        if (!sosBooking) return;
+        setSosLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await triggerSOS(sosBooking.id);
+            setSosAlertText(data.alertText);
+            setSuccess(data.message);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to dispatch SOS alert.');
+        } finally {
+            setSosLoading(false);
+            setSosConfirmOpen(false);
+        }
+    };
+
+    useEffect(() => {
+        const tab = params.get('tab') || 'my';
+        setActiveTab(tab);
+    }, [location.search]);
 
     useEffect(() => {
         if (user) {
@@ -519,6 +581,7 @@ export default function BookingsPage() {
                                     booking={booking}
                                     onCancel={handleCancel}
                                     isDriver={false}
+                                    onSOS={handleSOS}
                                 />
                             ))
                         )}
@@ -636,6 +699,97 @@ export default function BookingsPage() {
                     </div>
                 )}
             </div>
+
+            {/* SOS Confirmation Modal */}
+            {sosConfirmOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+                    backdropFilter: 'blur(4px)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                        borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '440px',
+                        boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+                    }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '24px' }}>🚨</div>
+                            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: 0 }}>
+                                Confirm SOS Emergency Alert
+                            </h3>
+                        </div>
+                        <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                            Are you sure you want to send an emergency alert to your trusted contacts? This will instantly compile and dispatch your current passenger, driver, vehicle, and trip route details via simulated SMS.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => setSosConfirmOpen(false)}
+                                style={{
+                                    flex: 1, padding: '12px', border: `1px solid ${theme.border}`,
+                                    backgroundColor: 'white', color: theme.textSecondary,
+                                    borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmSOS}
+                                disabled={sosLoading}
+                                style={{
+                                    flex: 1, padding: '12px', border: 'none',
+                                    backgroundColor: theme.danger, color: 'white',
+                                    borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                                }}
+                            >
+                                {sosLoading ? 'Sending Alert...' : 'Send Alert'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SOS Success & Alert Text Modal */}
+            {sosAlertText && (
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+                    backdropFilter: 'blur(4px)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                        borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '500px',
+                        boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+                    }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '24px' }}>✅</div>
+                            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.success, margin: 0 }}>
+                                Emergency Alert Dispatched
+                            </h3>
+                        </div>
+                        <p style={{ color: theme.textSecondary, fontSize: '14.5px', lineHeight: '1.6', marginBottom: '16px' }}>
+                            Your emergency contacts have been notified with the following trip safety information:
+                        </p>
+                        <div style={{
+                            backgroundColor: '#F9FAFB', border: `1px solid ${theme.border}`,
+                            borderRadius: '10px', padding: '16px', whiteSpace: 'pre-wrap',
+                            fontSize: '12.5px', fontFamily: 'monospace', color: theme.textPrimary,
+                            maxHeight: '220px', overflowY: 'auto', marginBottom: '24px'
+                        }}>
+                            {sosAlertText}
+                        </div>
+                        <button
+                            onClick={() => setSosAlertText('')}
+                            style={{
+                                width: '100%', padding: '12px', border: 'none',
+                                backgroundColor: theme.textPrimary, color: 'white',
+                                borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                            }}
+                        >
+                            Close Window
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

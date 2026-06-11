@@ -169,3 +169,22 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 ALTER TABLE rides
 ADD COLUMN total_trip_cost DECIMAL(10,2) NOT NULL DEFAULT 0;
+
+
+
+
+
+
+-- 1. Enable pgcrypto extension for UUID generation (if not already enabled)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- 2. Create the emergency_contacts table
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            VARCHAR(100) NOT NULL,
+    relationship    VARCHAR(50) NOT NULL,
+    phone           VARCHAR(15) NOT NULL,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    updated_at      TIMESTAMP DEFAULT NOW()
+);

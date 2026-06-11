@@ -52,8 +52,14 @@ export const createBooking = async (ride_id, traveler_id, seats_booked, pickup_p
 // Get all bookings by a traveler
 export const getBookingsByTraveler = async (traveler_id) => {
     const result = await pool.query(
-        `SELECT b.*,
-                r.origin, r.destination, r.departure_time, r.price_per_seat,
+        `SELECT b.id, b.ride_id, b.traveler_id, b.seats_booked, b.pickup_point, b.drop_point, b.total_fare,
+                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at,
+                CASE 
+                    WHEN r.status = 'COMPLETED' THEN 'COMPLETED'
+                    WHEN r.status = 'CANCELLED' THEN 'CANCELLED'
+                    ELSE b.status 
+                END AS status,
+                r.origin, r.destination, r.departure_time, r.price_per_seat, r.status AS ride_status,
                 u.name AS driver_name, u.avg_rating,
                 v.vehicle_name, v.vehicle_type, v.vehicle_number
          FROM bookings b
@@ -87,7 +93,13 @@ export const getBookingsByRide = async (ride_id) => {
 // Get single booking by ID
 export const getBookingById = async (booking_id) => {
     const result = await pool.query(
-        `SELECT b.*,
+        `SELECT b.id, b.ride_id, b.traveler_id, b.seats_booked, b.pickup_point, b.drop_point, b.total_fare,
+                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at,
+                CASE 
+                    WHEN r.status = 'COMPLETED' THEN 'COMPLETED'
+                    WHEN r.status = 'CANCELLED' THEN 'CANCELLED'
+                    ELSE b.status 
+                END AS status,
                 r.driver_id, r.origin, r.destination,
                 r.departure_time, r.available_seats,
                 r.status AS ride_status, r.price_per_seat

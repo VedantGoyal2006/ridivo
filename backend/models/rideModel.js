@@ -86,7 +86,7 @@ export const searchRides = async (origin, destination, date, seats) => {
          LEFT JOIN ride_waypoints rw ON r.id = rw.ride_id
          WHERE r.status = 'ACTIVE'
            AND r.available_seats >= $1
-           AND DATE(r.departure_time) = $2
+           AND DATE(r.departure_time) BETWEEN $2::DATE AND $2::DATE + INTERVAL '3 days'
            AND (
                LOWER(r.origin) LIKE LOWER('%' || $3 || '%')
                OR LOWER(rw.location_name) LIKE LOWER('%' || $3 || '%')
@@ -188,16 +188,37 @@ export const cancelRide = async (id) => {
 
 // Complete a ride
 export const completeRide = async (id) => {
-    const result = await pool.query(
-        `UPDATE rides SET
-            status = 'COMPLETED',
-            updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [id]
-    );
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
 
-    return result.rows[0];
+        // 1. Update the ride status
+        const rideResult = await client.query(
+            `UPDATE rides SET
+                status = 'COMPLETED',
+                updated_at = NOW()
+             WHERE id = $1
+             RETURNING *`,
+            [id]
+        );
+
+        // 2. Update all CONFIRMED bookings for this ride to COMPLETED
+        await client.query(
+            `UPDATE bookings SET
+                status = 'COMPLETED',
+                updated_at = NOW()
+             WHERE ride_id = $1 AND status = 'CONFIRMED'`,
+            [id]
+        );
+
+        await client.query('COMMIT');
+        return rideResult.rows[0];
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
 };
 
 // Add waypoints to a ride

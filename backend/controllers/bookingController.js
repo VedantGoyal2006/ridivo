@@ -1,3 +1,4 @@
+import pool from '../config/db.js';
 import {
     createBooking as createBookingInDB,
     getBookingsByTraveler as getBookingsByTravelerFromDB,
@@ -245,6 +246,105 @@ export const cancelBooking = async (req, res) => {
             return res.status(400).json({ message: err.message });
         }
 
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// POST /api/bookings/:id/sos
+export const triggerSOS = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Get the booking and join to get all required details
+        const bookingQuery = await pool.query(
+            `SELECT b.id AS booking_id, b.status AS booking_status, b.traveler_id,
+                    u_pass.name AS passenger_name,
+                    r.origin, r.destination, r.departure_time, r.status AS ride_status,
+                    u_driver.name AS driver_name, u_driver.id AS driver_id,
+                    v.color AS vehicle_color, v.vehicle_number,
+                    dv.aadhar_number AS driver_aadhar
+             FROM bookings b
+             JOIN users u_pass ON b.traveler_id = u_pass.id
+             JOIN rides r ON b.ride_id = r.id
+             JOIN users u_driver ON r.driver_id = u_driver.id
+             LEFT JOIN vehicles v ON r.vehicle_id = v.id
+             LEFT JOIN driver_verifications dv ON r.driver_id = dv.user_id
+             WHERE b.id = $1`,
+            [id]
+        );
+
+        if (bookingQuery.rows.length === 0) {
+            return res.status(404).json({ message: 'Booking not found' });
+        }
+
+        const booking = bookingQuery.rows[0];
+
+        // 2. Check that the booking belongs to the logged-in user
+        if (booking.traveler_id !== req.user.id) {
+            return res.status(403).json({ message: 'Access denied. This is not your booking.' });
+        }
+
+        // 3. Verify booking status is CONFIRMED
+        if (booking.booking_status !== 'CONFIRMED') {
+            return res.status(400).json({ message: 'SOS can only be sent for CONFIRMED bookings.' });
+        }
+
+        // 4. Fetch the user's emergency contacts
+        const contactsQuery = await pool.query(
+            `SELECT name, relationship, phone FROM emergency_contacts WHERE user_id = $1`,
+            [req.user.id]
+        );
+
+        const contacts = contactsQuery.rows;
+        if (contacts.length === 0) {
+            return res.status(400).json({
+                message: 'No emergency contacts found. Please add emergency contacts in your Profile first.'
+            });
+        }
+
+        // 5. Format the emergency message
+        const formattedDepartureTime = new Date(booking.departure_time).toLocaleString('en-IN', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        });
+
+        const alertMessage = 
+`🚨 EMERGENCY ALERT FROM RIDIVO 🚨
+
+Passenger: ${booking.passenger_name}
+
+Driver: ${booking.driver_name}
+Driver Aadhar Card: ${booking.driver_aadhar || 'N/A'}
+
+Vehicle: ${booking.vehicle_color || 'N/A'}
+Vehicle Number: ${booking.vehicle_number || 'N/A'}
+
+Trip:
+${booking.origin} → ${booking.destination}
+
+Ride Started At:
+${formattedDepartureTime}`;
+
+        // 6. Simulate SMS dispatch by logging to console
+        console.log('\n==================================================');
+        console.log(`SOS ALERT TRIGGERED BY USER: ${booking.passenger_name} (ID: ${req.user.id})`);
+        console.log(`Active Booking ID: ${booking.booking_id}`);
+        console.log('--------------------------------------------------');
+        contacts.forEach((contact, idx) => {
+            console.log(`[SMS DISPATCH] To: ${contact.phone} (${contact.name} - ${contact.relationship})`);
+            console.log('Message:');
+            console.log(alertMessage);
+            console.log('--------------------------------------------------');
+        });
+        console.log('==================================================\n');
+
+        return res.status(200).json({
+            message: `Emergency alert successfully dispatched to ${contacts.length} contact(s).`,
+            alertText: alertMessage
+        });
+
+    } catch (err) {
+        console.error('triggerSOS error:', err.message);
         return res.status(500).json({ message: 'Server error' });
     }
 };
