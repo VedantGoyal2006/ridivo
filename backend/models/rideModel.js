@@ -199,13 +199,11 @@ export const addWaypoints = async (ride_id, waypoints) => {
     const inserted = [];
 
     for (const [index, wp] of waypoints.entries()) {
-        const result = await pool.query(
-            `INSERT INTO ride_waypoints 
-                (ride_id, location_name, lat, lng, stop_order)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *`,
-            [ride_id, wp.location_name, wp.lat, wp.lng, index + 1]
-        );
+      const result = await pool.query(
+    `INSERT INTO ride_waypoints (ride_id, location_name, lat, lng, stop_order, distance_from_origin)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [ride_id, wp.location_name, wp.lat, wp.lng, index + 1, wp.distance_from_origin || 0]
+);
         inserted.push(result.rows[0]);
     }
 
