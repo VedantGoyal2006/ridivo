@@ -118,47 +118,51 @@ export default function RidesPage() {
         setSearching(false);
     };
 
-    const handlePostRide = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setPosting(true);
-        try {
-            const response = await createRide(postForm);
+   const handlePostRide = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setPosting(true);
+    try {
+        const response = await createRide(postForm);
 
-            if (postForm.waypoints && postForm.waypoints.length > 0) {
-                const validWaypoints = postForm.waypoints.filter(wp => wp.location_name.trim() !== '');
-                if (validWaypoints.length > 0) {
-                    try {
-                        const distanceData = await axiosInstance.post('/ai/waypoint-distances', {
-                            origin: postForm.origin,
-                            destination: postForm.destination,
-                            waypoints: validWaypoints
-                        });
-                        const waypointsWithDistances = validWaypoints.map(wp => {
-                            const distInfo = distanceData.data.waypoints.find(
-                                d => d.location.toLowerCase() === wp.location_name.toLowerCase()
-                            );
-                            return { ...wp, distance_from_origin: distInfo ? distInfo.distance_from_origin : 0 };
-                        });
-                        await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, { waypoints: waypointsWithDistances });
-                        await axiosInstance.put(`/rides/${response.ride.id}`, { ...postForm, total_distance: distanceData.data.total_distance });
-                    } catch (err) {
-                        await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, { waypoints: validWaypoints });
-                    }
+        if (postForm.waypoints && postForm.waypoints.length > 0) {
+            const validWaypoints = postForm.waypoints.filter(wp => wp.location_name.trim() !== '');
+            if (validWaypoints.length > 0) {
+                try {
+                    const distanceData = await axiosInstance.post('/ai/waypoint-distances', {
+                        origin: postForm.origin,
+                        destination: postForm.destination,
+                        waypoints: validWaypoints
+                    });
+                    const waypointsWithDistances = validWaypoints.map(wp => {
+                        const distInfo = distanceData.data.waypoints.find(
+                            d => d.location.toLowerCase() === wp.location_name.toLowerCase()
+                        );
+                        return { ...wp, distance_from_origin: distInfo ? distInfo.distance_from_origin : 0 };
+                    });
+                    await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, { waypoints: waypointsWithDistances });
+                } catch (err) {
+                    await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, { waypoints: validWaypoints });
                 }
             }
-
-            setSuccess('Ride posted successfully!');
-            setPostForm({ vehicle_id: '', origin: '', destination: '', departure_time: '', total_seats: '', total_trip_cost: '', description: '', waypoints: [] });
-            setAiSuggestion(null);
-            await fetchMyRides();
-            setActiveTab('my');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to post ride');
         }
-        setPosting(false);
-    };
+
+        setSuccess('Ride posted successfully!');
+        setPostForm({
+            vehicle_id: '', origin: '', destination: '',
+            departure_time: '', total_seats: '',
+            total_trip_cost: '', description: '',
+            waypoints: []
+        });
+        setAiSuggestion(null);
+        await fetchMyRides();
+        setActiveTab('my');
+    } catch (err) {
+        setError(err.response?.data?.message || 'Failed to post ride');
+    }
+    setPosting(false);
+};
 
     const handleBookRide = async (rideId, pickupPoint, dropPoint) => {
         try {
