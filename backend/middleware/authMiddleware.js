@@ -6,19 +6,16 @@ dotenv.config();
 
 export const protect = async (req, res, next) => {
     try {
-        // 1. Check if token exists in headers
-        const authHeader = req.headers.authorization;
+        // 1. Check if token exists in cookies
+        const token = req.cookies.accessToken;
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!token) {
             return res.status(401).json({ 
                 message: 'Not authorized, no token' 
             });
         }
 
-        // 2. Extract token
-        const token = authHeader.split(' ')[1];
-
-        // 3. Verify token
+        // 2. Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // 4. Find user from token

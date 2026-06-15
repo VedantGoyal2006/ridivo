@@ -16,7 +16,7 @@ const navLinks = [
   { label: "Find a Ride", href: "/rides" },
   { label: "Offer a Ride", href: "/rides" },
   { label: "My Bookings", href: "/bookings" },
-  { label: "How it Works", href: "#how" },
+  { label: "How it Works", href: "/how-it-works" },
   { label: "Safety", href: "#safety" },
   { label: "About Us", href: "#about" },
 ];

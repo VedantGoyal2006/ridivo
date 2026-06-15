@@ -4,9 +4,8 @@ import jwt from 'jsonwebtoken';
 // Helper to extract user ID from JWT token (for per-user tracking), falling back to IP
 const keyGenerator = (req) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
+        const token = req.cookies.accessToken;
+        if (token) {
             const decoded = jwt.decode(token);
             if (decoded && decoded.id) {
                 return `user:${decoded.id}`;

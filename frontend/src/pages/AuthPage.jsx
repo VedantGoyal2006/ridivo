@@ -146,7 +146,7 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const data = await loginUser(loginEmail, loginPassword);
-      login(data.accessToken, data.user);
+      login(data.user);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -161,7 +161,7 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const data = await signupUser(name, email, phone, password);
-      login(data.accessToken, data.user);
+      login(data.user);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.');

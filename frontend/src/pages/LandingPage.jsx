@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import RidivoLogo from '../components/RidivoLogo';
 import {
   Search,
@@ -42,6 +43,7 @@ function useInView(threshold = 0.15) {
 
 // ─── HERO ────────────────────────────────────────────────────────────────────
 function Hero() {
+  const navigate = useNavigate();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState("");
@@ -90,27 +92,31 @@ function Hero() {
           </p>
 
           <div style={{ display: "flex", gap: "14px", marginBottom: "48px", flexWrap: "wrap" }}>
-            <button style={{
-              display: "flex", alignItems: "center", gap: "10px",
-              backgroundColor: "white", color: colors.dark,
-              border: "none", borderRadius: "12px", padding: "14px 28px",
-              fontSize: "15px", fontWeight: "700", cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif", transition: "all 0.25s ease",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            }}
+            <button 
+              onClick={() => navigate("/login")}
+              style={{
+                display: "flex", alignItems: "center", gap: "10px",
+                backgroundColor: "white", color: colors.dark,
+                border: "none", borderRadius: "12px", padding: "14px 28px",
+                fontSize: "15px", fontWeight: "700", cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif", transition: "all 0.25s ease",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+              }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,0.2)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.15)"; }}
             >
               <Search size={18} strokeWidth={2.5} style={{ color: colors.dark }} />
               Find a Ride
             </button>
-            <button style={{
-              display: "flex", alignItems: "center", gap: "10px",
-              backgroundColor: "transparent", color: "white",
-              border: "2px solid rgba(255,255,255,0.4)", borderRadius: "12px", padding: "14px 28px",
-              fontSize: "15px", fontWeight: "700", cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif", transition: "all 0.25s ease",
-            }}
+            <button 
+              onClick={() => navigate("/login")}
+              style={{
+                display: "flex", alignItems: "center", gap: "10px",
+                backgroundColor: "transparent", color: "white",
+                border: "2px solid rgba(255,255,255,0.4)", borderRadius: "12px", padding: "14px 28px",
+                fontSize: "15px", fontWeight: "700", cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif", transition: "all 0.25s ease",
+              }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)"; e.currentTarget.style.transform = "translateY(0)"; }}
             >
@@ -188,12 +194,14 @@ function Hero() {
                 <span style={{ fontSize: "12px", color: "#374151", fontFamily: "'DM Sans',sans-serif" }}>{seats}</span>
               </div>
             </div>
-            <button style={{
-              width: "100%", padding: "12px", backgroundColor: colors.dark,
-              color: "white", border: "none", borderRadius: "12px",
-              fontSize: "14px", fontWeight: "700", cursor: "pointer",
-              fontFamily: "'DM Sans',sans-serif", transition: "all 0.2s ease",
-            }}
+            <button 
+              onClick={() => navigate("/login")}
+              style={{
+                width: "100%", padding: "12px", backgroundColor: colors.dark,
+                color: "white", border: "none", borderRadius: "12px",
+                fontSize: "14px", fontWeight: "700", cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif", transition: "all 0.2s ease",
+              }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#0a4d78"; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.dark; }}
             >Search Rides →</button>
@@ -206,6 +214,7 @@ function Hero() {
 
 // ─── SEARCH BAR ──────────────────────────────────────────────────────────────
 function SearchBar() {
+  const navigate = useNavigate();
   const [ref, inView] = useInView();
   return (
     <section ref={ref} style={{ backgroundColor: "white", padding: "0 40px", position: "relative", zIndex: 10 }}>
@@ -247,13 +256,15 @@ function SearchBar() {
             {[1, 2, 3, 4].map(n => <option key={n}>{n} Passenger{n > 1 ? "s" : ""}</option>)}
           </select>
         </div>
-        <button style={{
-          backgroundColor: colors.dark, color: "white", border: "none",
-          borderRadius: "12px", padding: "12px 28px", fontSize: "15px",
-          fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-          whiteSpace: "nowrap", transition: "all 0.2s ease",
-          boxShadow: `0 4px 16px rgba(9,60,93,0.3)`,
-        }}
+        <button 
+          onClick={() => navigate("/login")}
+          style={{
+            backgroundColor: colors.dark, color: "white", border: "none",
+            borderRadius: "12px", padding: "12px 28px", fontSize: "15px",
+            fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+            whiteSpace: "nowrap", transition: "all 0.2s ease",
+            boxShadow: `0 4px 16px rgba(9,60,93,0.3)`,
+          }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#0a4d78"; e.currentTarget.style.transform = "translateY(-1px)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.dark; e.currentTarget.style.transform = "translateY(0)"; }}
         >Search Rides</button>
@@ -390,6 +401,7 @@ function Stats() {
 
 // ─── EARN SECTION ─────────────────────────────────────────────────────────────
 function EarnSection() {
+  const navigate = useNavigate();
   const [ref, inView] = useInView();
   return (
     <section ref={ref} style={{ backgroundColor: "white", padding: "100px 40px" }}>
@@ -433,14 +445,16 @@ function EarnSection() {
           <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "17px", color: colors.gray, lineHeight: "1.7", marginBottom: "36px" }}>
             Offer your ride, fill your seats, and split the travel cost fairly while helping others travel affordably across India.
           </p>
-          <button style={{
-            display: "flex", alignItems: "center", gap: "10px",
-            backgroundColor: colors.dark, color: "white",
-            border: "none", borderRadius: "12px", padding: "14px 28px",
-            fontSize: "15px", fontWeight: "700", cursor: "pointer",
-            fontFamily: "'DM Sans',sans-serif", transition: "all 0.25s ease",
-            boxShadow: `0 4px 20px rgba(9, 60, 93, 0.25)`,
-          }}
+          <button 
+            onClick={() => navigate("/login")}
+            style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              backgroundColor: colors.dark, color: "white",
+              border: "none", borderRadius: "12px", padding: "14px 28px",
+              fontSize: "15px", fontWeight: "700", cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif", transition: "all 0.25s ease",
+              boxShadow: `0 4px 20px rgba(9, 60, 93, 0.25)`,
+            }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(9, 60, 93, 0.35)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(9, 60, 93, 0.25)"; }}
           >

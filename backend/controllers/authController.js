@@ -48,18 +48,24 @@ export const signup = async (req, res) => {
             [newUser.id, refreshToken]
         );
 
-        // 8. Send refresh token in cookie
+        // 8. Send tokens in HTTP-only cookies
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutes
+        });
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: false,
             sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
 
         // 9. Send response
         return res.status(201).json({
             message: 'Account created successfully',
-            accessToken,
             user: newUser
         });
 
@@ -125,18 +131,24 @@ export const login = async (req, res) => {
             [user.id, refreshToken]
         );
 
-        // 7. Send refresh token in cookie
+        // 7. Send tokens in HTTP-only cookies
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutes
+        });
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: false,
             sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
 
         // 8. Send response
         return res.status(200).json({
             message: 'Login successful',
-            accessToken,
             user: {
                 id: user.id,
                 name: user.name,
@@ -205,8 +217,16 @@ export const refreshToken = async (req, res) => {
         // 6. Generate new access token
         const accessToken = generateAccessToken(user);
 
+        // 7. Send new access token in HTTP-only cookie
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutes
+        });
+
         return res.status(200).json({ 
-            accessToken 
+            message: 'Token refreshed successfully' 
         });
 
     } catch (err) {
@@ -233,7 +253,11 @@ export const logout = async (req, res) => {
             );
         }
 
-        // 3. Clear cookie
+        // 3. Clear cookies
+        res.clearCookie('accessToken', {
+            httpOnly: true,
+            sameSite: 'strict'
+        });
         res.clearCookie('refreshToken', {
             httpOnly: true,
             sameSite: 'strict'
@@ -266,7 +290,14 @@ export const googleAuthCallback = async (req, res) => {
             [user.id, refreshToken]
         );
 
-        // 3. Send refresh token in cookie
+        // 3. Send tokens in cookies
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000
+        });
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: false,
@@ -274,9 +305,9 @@ export const googleAuthCallback = async (req, res) => {
             maxAge: 30 * 24 * 60 * 60 * 1000
         });
 
-        // 4. Redirect to frontend with access token
+        // 4. Redirect to frontend callback page
         res.redirect(
-            `${process.env.CLIENT_URL}/auth/success?token=${accessToken}`
+            `${process.env.CLIENT_URL}/auth/success`
         );
 
     } catch (err) {

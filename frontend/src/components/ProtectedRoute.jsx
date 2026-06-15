@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   // Not logged in → redirect to login
-  if (!accessToken) {
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

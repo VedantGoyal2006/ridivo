@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-ro
 import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
 import { Toaster } from 'react-hot-toast'
+import axiosInstance from './utils/axiosInstance'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import DashboardLayout from './components/DashboardLayout'
 import LandingPage from './pages/LandingPage'
+import HowItWorksPage from './pages/HowItWorksPage'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
@@ -17,21 +19,23 @@ import BookingsPage from './pages/BookingsPage'
 
 function AuthSuccess() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login } = useAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
-    if (token) {
-      const base64 = token.split('.')[1];
-      const decoded = JSON.parse(atob(base64));
-      login(token, { id: decoded.id, is_admin: decoded.is_admin });
-      navigate('/dashboard');
-    } else {
-      navigate('/login');
-    }
-  }, []);
+    axiosInstance.get('/users/profile')
+      .then(res => {
+        const user = res.data.user;
+        if (user) {
+          login(user);
+          navigate('/dashboard');
+        } else {
+          navigate('/login');
+        }
+      })
+      .catch(() => {
+        navigate('/login');
+      });
+  }, [login, navigate]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#EFF6FF' }}>
@@ -49,6 +53,7 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
+        <Route path="/how-it-works" element={<><Navbar /><HowItWorksPage /></>} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
