@@ -10,6 +10,7 @@ import {
     addWaypoints as addWaypointsInDB,
     hasConfirmedBookings
 } from '../models/rideModel.js';
+import { sendNotification } from '../utils/notificationHelper.js';
 
 // POST /api/rides
 export const createRide = async (req, res) => {
@@ -223,6 +224,22 @@ export const deleteRide = async (req, res) => {
         // 4. Cancel the ride
         const cancelled = await cancelRideInDB(req.params.id);
 
+        // Fetch travelers with confirmed bookings to notify them
+        const bookingsResult = await pool.query(
+            `SELECT traveler_id FROM bookings WHERE ride_id = $1 AND status = 'CONFIRMED'`,
+            [req.params.id]
+        );
+        
+        for (const booking of bookingsResult.rows) {
+            await sendNotification(
+                booking.traveler_id,
+                "Ride Cancelled",
+                `${req.user.name} cancelled the ride from ${ride.origin} to ${ride.destination}.`,
+                "RIDE",
+                ride.id
+            );
+        }
+
         return res.status(200).json({
             message: 'Ride cancelled successfully',
             ride: cancelled
@@ -262,6 +279,22 @@ export const completeRide = async (req, res) => {
 
         // 4. Complete the ride
         const completed = await completeRideInDB(req.params.id);
+
+        // Fetch travelers with confirmed bookings to notify them
+        const bookingsResult = await pool.query(
+            `SELECT traveler_id FROM bookings WHERE ride_id = $1 AND status = 'CONFIRMED'`,
+            [req.params.id]
+        );
+        
+        for (const booking of bookingsResult.rows) {
+            await sendNotification(
+                booking.traveler_id,
+                "Ride Completed",
+                `Your ride from ${ride.origin} to ${ride.destination} with ${req.user.name} is complete. Please leave a review!`,
+                "RIDE",
+                ride.id
+            );
+        }
 
         return res.status(200).json({
             message: 'Ride completed successfully',

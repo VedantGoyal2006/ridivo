@@ -9,6 +9,7 @@ import {
     cancelBooking as cancelBookingInDB
 } from '../models/bookingModel.js';
 import { getRideById as getRideFromDB } from '../models/rideModel.js';
+import { sendNotification } from '../utils/notificationHelper.js';
 
 // POST /api/bookings
 export const createBooking = async (req, res) => {
@@ -52,6 +53,15 @@ export const createBooking = async (req, res) => {
             parseInt(seats_booked),
             pickup_point,
             drop_point
+        );
+
+        // Send notification to the driver in real-time
+        await sendNotification(
+            ride.driver_id,
+            "New Booking Request",
+            `${req.user.name} requested ${seats_booked} seat(s) for your ride from ${ride.origin} to ${ride.destination}.`,
+            "BOOKING",
+            booking.id
         );
 
         return res.status(201).json({
@@ -146,6 +156,15 @@ export const acceptBooking = async (req, res) => {
 
         const updated = await acceptBookingInDB(req.params.id);
 
+        // Notify traveler in real-time
+        await sendNotification(
+            booking.traveler_id,
+            "Booking Request Accepted",
+            `${req.user.name} accepted your booking request from ${booking.origin} to ${booking.destination}.`,
+            "BOOKING",
+            booking.id
+        );
+
         return res.status(200).json({
             message: 'Booking accepted successfully',
             booking: updated
@@ -188,6 +207,15 @@ export const rejectBooking = async (req, res) => {
 
         const updated = await rejectBookingInDB(req.params.id);
 
+        // Notify traveler in real-time
+        await sendNotification(
+            booking.traveler_id,
+            "Booking Request Rejected",
+            `${req.user.name} declined your booking request from ${booking.origin} to ${booking.destination}.`,
+            "BOOKING",
+            booking.id
+        );
+
         return res.status(200).json({
             message: 'Booking rejected',
             booking: updated
@@ -229,6 +257,15 @@ export const cancelBooking = async (req, res) => {
             req.params.id,
             'TRAVELER',
             cancellation_reason || null
+        );
+
+        // Notify driver in real-time
+        await sendNotification(
+            booking.driver_id,
+            "Booking Cancelled",
+            `${req.user.name} cancelled their booking of ${booking.seats_booked} seat(s) for your ride from ${booking.origin} to ${booking.destination}.`,
+            "BOOKING",
+            booking.id
         );
 
         // TODO: if booking was CONFIRMED and payment made

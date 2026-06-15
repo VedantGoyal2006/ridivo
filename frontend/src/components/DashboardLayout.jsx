@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import RidivoLogo from "./RidivoLogo";
+import { io } from "socket.io-client";
+import { toast } from "react-hot-toast";
+import {
+  getNotifications as getNotificationsApi,
+  markAllRead as markAllReadApi,
+  markRead as markReadApi,
+} from "../services/notificationService";
 import {
   LayoutDashboard,
   Search,
@@ -36,12 +43,38 @@ const theme = {
   dangerBg: "#FEE2E2",
 };
 
-const notificationsMock = [
-  { id: 1, text: "Rahul accepted your booking request", time: "2 min ago", read: false, icon: ShieldCheck, color: theme.success },
-  { id: 2, text: "Your ride to Indore is tomorrow at 8:30 AM", time: "1 hr ago", read: false, icon: Car, color: theme.accent },
-  { id: 3, text: "Payment of ₹320 confirmed", time: "2 hrs ago", read: true, icon: Coins, color: theme.warning },
-  { id: 4, text: "Kiran left you a 5★ review", time: "Yesterday", read: true, icon: Star, color: "#7C3AED" },
-];
+const getNotificationStyles = (type) => {
+  switch (type) {
+    case 'BOOKING':
+      return { icon: ShieldCheck, color: theme.success };
+    case 'RIDE':
+      return { icon: Car, color: theme.accent };
+    case 'PAYMENT':
+      return { icon: Coins, color: theme.warning };
+    case 'VERIFICATION':
+      return { icon: ShieldCheck, color: theme.success };
+    case 'SYSTEM':
+    default:
+      return { icon: Bell, color: theme.accent };
+  }
+};
+
+const formatNotificationTime = (dateString) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  if (diffMs < 0) return "Just now";
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
@@ -50,9 +83,9 @@ export default function DashboardLayout() {
   
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notifications, setNotifications] = useState(notificationsMock);
+  const [notifications, setNotifications] = useState([]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const currentPath = location.pathname + location.search;
 
@@ -71,9 +104,103 @@ export default function DashboardLayout() {
     navigate("/");
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadApi();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error("Failed to mark all read:", err);
+    }
   };
+
+  const handleMarkRead = async (id) => {
+    try {
+      await markReadApi(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  // Socket Connection and API loading
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Fetch notifications
+    const fetchNotifications = async () => {
+      try {
+        const data = await getNotificationsApi();
+        setNotifications(data.notifications || []);
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+      }
+    };
+    fetchNotifications();
+
+    // Establish Socket connection
+    const socket = io("http://localhost:5000", {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id);
+      socket.emit("register", user.id);
+    });
+
+    socket.on("notification", (newNotif) => {
+      console.log("New real-time notification received:", newNotif);
+      setNotifications((prev) => [newNotif, ...prev].slice(0, 20));
+
+      // Show beautiful custom toast
+      toast.custom(
+        (t) => {
+          const styles = getNotificationStyles(newNotif.type);
+          const Icon = styles.icon;
+          return (
+            <div
+              onClick={() => {
+                toast.dismiss(t.id);
+                setNotifOpen(true);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "12px 16px",
+                backgroundColor: theme.cardBg,
+                color: theme.textPrimary,
+                border: `1px solid ${theme.border}`,
+                borderRadius: "12px",
+                boxShadow: "0 10px 25px rgba(9, 60, 93, 0.1)",
+                fontFamily: "'DM Sans', sans-serif",
+                cursor: "pointer",
+                maxWidth: "350px",
+                transition: "all 0.2s ease-in-out",
+                opacity: t.visible ? 1 : 0,
+                transform: t.visible ? "translateY(0)" : "translateY(-20px)",
+              }}
+            >
+              <div style={{ flexShrink: 0, color: styles.color, display: "flex" }}>
+                <Icon size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "700", fontSize: "13px", fontFamily: "'Sora', sans-serif" }}>{newNotif.title}</div>
+                <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{newNotif.message}</div>
+              </div>
+            </div>
+          );
+        },
+        { duration: 5000 }
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.id]);
 
   // Determine active item based on path prefix/parameters
   const isItemActive = (itemPath) => {
@@ -297,29 +424,40 @@ export default function DashboardLayout() {
                       <span onClick={handleMarkAllRead} style={{ fontSize: "12px", color: theme.accent, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: "600" }}>Mark all read</span>
                     )}
                   </div>
-                  {notifications.map((n) => {
-                    const NotificationIcon = n.icon;
-                    return (
-                      <div key={n.id} style={{
-                        padding: "14px 20px", display: "flex", gap: "12px", alignItems: "flex-start",
-                        backgroundColor: n.read ? "transparent" : "rgba(9, 60, 93, 0.01)",
-                        borderBottom: `1px solid ${theme.border}`,
-                        transition: "background 0.2s",
-                      }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(9, 60, 93, 0.02)"}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = n.read ? "transparent" : "rgba(9, 60, 93, 0.01)"}
-                      >
-                        <div style={{ flexShrink: 0, color: n.color, display: "flex", alignItems: "center", marginTop: "2px" }}>
-                          <NotificationIcon size={16} />
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "24px 20px", textAlign: "center", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", fontSize: "13px" }}>
+                      No notifications yet
+                    </div>
+                  ) : (
+                    notifications.map((n) => {
+                      const styles = getNotificationStyles(n.type);
+                      const NotificationIcon = styles.icon;
+                      return (
+                        <div key={n.id} 
+                          onClick={() => !n.is_read && handleMarkRead(n.id)}
+                          style={{
+                            padding: "14px 20px", display: "flex", gap: "12px", alignItems: "flex-start",
+                            backgroundColor: n.is_read ? "transparent" : "rgba(9, 60, 93, 0.03)",
+                            borderBottom: `1px solid ${theme.border}`,
+                            cursor: "pointer",
+                            transition: "background 0.2s",
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(9, 60, 93, 0.05)"}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = n.is_read ? "transparent" : "rgba(9, 60, 93, 0.03)"}
+                        >
+                          <div style={{ flexShrink: 0, color: styles.color, display: "flex", alignItems: "center", marginTop: "2px" }}>
+                            <NotificationIcon size={16} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "13px", fontWeight: "700", color: theme.textPrimary, lineHeight: "1.4", marginBottom: "2px" }}>{n.title}</div>
+                            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary, lineHeight: "1.4", marginBottom: "4px" }}>{n.message}</div>
+                            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: theme.textSecondary }}>{formatNotificationTime(n.created_at)}</div>
+                          </div>
+                          {!n.is_read && <div style={{ width: "8px", height: "8px", backgroundColor: theme.accent, borderRadius: "50%", flexShrink: 0, marginTop: "4px" }} />}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textPrimary, lineHeight: "1.4", marginBottom: "4px" }}>{n.text}</div>
-                          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>{n.time}</div>
-                        </div>
-                        {!n.read && <div style={{ width: "8px", height: "8px", backgroundColor: theme.accent, borderRadius: "50%", flexShrink: 0, marginTop: "4px" }} />}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>

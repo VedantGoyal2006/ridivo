@@ -172,9 +172,6 @@ ADD COLUMN total_trip_cost DECIMAL(10,2) NOT NULL DEFAULT 0;
 
 
 
-
-
-
 -- 1. Enable pgcrypto extension for UUID generation (if not already enabled)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

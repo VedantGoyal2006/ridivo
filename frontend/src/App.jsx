@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useAuth } from './context/AuthContext'
+import { Toaster } from 'react-hot-toast'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import DashboardLayout from './components/DashboardLayout'
@@ -44,6 +45,7 @@ function AuthSuccess() {
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
