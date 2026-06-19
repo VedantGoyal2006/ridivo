@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import session from 'express-session';
+import sessionStore from './config/sessionStore.js';
 import passport from 'passport';
 import './config/passport.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
@@ -18,13 +20,28 @@ dotenv.config();
 
 const app = express();
 
+//This CORS configuration allows only my frontend application to access the backend APIs and permits cookies to be sent along with requests for authentication.
+
 app.use(cors({ 
-    origin: process.env.CLIENT_URL, 
-    credentials: true 
+    origin: process.env.CLIENT_URL,  //I allow requests only from my frontend running on http://localhost:5173
+    credentials: true     //Frontend is allowed to send cookies to the backend
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(session({
+    secret: process.env.JWT_SECRET || 'ridivo_session_secret',
+    resave: false,
+    saveUninitialized: false,
+    store: sessionStore,
+    cookie: {
+        httpOnly: true,
+        secure: false, // Set to true if using HTTPS in prod
+        sameSite: 'lax', // Required for Google OAuth callback flow
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    }
+}));
 app.use(passport.initialize());
+app.use(passport.session());
 
 // Apply general API rate limiter globally
 app.use('/api', apiRateLimiter);

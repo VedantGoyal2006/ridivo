@@ -3,7 +3,6 @@ import passport from 'passport';
 import { 
     signup, 
     login, 
-    refreshToken, 
     logout,
     googleAuthCallback
 } from '../controllers/authController.js';
@@ -16,7 +15,6 @@ const router = express.Router();
 // Email/Password routes
 router.post('/signup', loginRateLimiter, validateSignup, signup);
 router.post('/login', loginRateLimiter, validateLogin, login);
-router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 
 // Google OAuth routes
@@ -26,7 +24,7 @@ router.get('/google', passport.authenticate('google', {
 
 router.get('/google/callback',
     passport.authenticate('google', { 
-        session: false,
+        session: true,
         failureRedirect: '/api/auth/google/failed'
     }),
     googleAuthCallback

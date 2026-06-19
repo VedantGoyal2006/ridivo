@@ -1,10 +1,10 @@
 import bcrypt from 'bcryptjs';
+import passport from 'passport';
 import pool from '../config/db.js';
-import { createUser, findUserByEmail, findUserById } from '../models/userModel.js';
-import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.js';
-import jwt from 'jsonwebtoken';
+import { createUser, findUserByEmail } from '../models/userModel.js';
 
-export const signup = async (req, res) => {
+// SIGNUP CONTROLLER
+export const signup = async (req, res, next) => {
     const { name, email, password, phone } = req.body;
 
     try {
@@ -37,36 +37,15 @@ export const signup = async (req, res) => {
         // 5. Create user in DB
         const newUser = await createUser(name, email, hashedPassword, phone);
 
-        // 6. Generate tokens
-        const accessToken = generateAccessToken(newUser);
-        const refreshToken = generateRefreshToken(newUser);
-
-        // 7. Store refresh token in sessions table
-        await pool.query(
-            `INSERT INTO sessions (user_id, refresh_token, expires_at) 
-             VALUES ($1, $2, NOW() + INTERVAL '30 days')`,
-            [newUser.id, refreshToken]
-        );
-
-        // 8. Send tokens in HTTP-only cookies
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 minutes
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
-
-        // 9. Send response
-        return res.status(201).json({
-            message: 'Account created successfully',
-            user: newUser
+        // 6. Log the user in to establish session
+        req.login(newUser, (err) => {
+            if (err) {
+                return next(err);
+            }
+            return res.status(201).json({
+                message: 'Account created successfully',
+                user: newUser
+            });
         });
 
     } catch (err) {
@@ -75,241 +54,73 @@ export const signup = async (req, res) => {
     }
 };
 
-
-
-
-
-export const login = async (req, res) => {
+// LOGIN CONTROLLER
+export const login = (req, res, next) => {
     const { email, password } = req.body;
 
-    try {
-        // 1. Check all fields
-        if (!email || !password) {
-            return res.status(400).json({ 
-                message: 'Email and password are required' 
-            });
-        }
+    // 1. Check all fields
+    if (!email || !password) {
+        return res.status(400).json({ 
+            message: 'Email and password are required' 
+        });
+    }
 
-        // 2. Check if user exists
-        const user = await findUserByEmail(email);
+    // 2. Authenticate using Passport Local Strategy
+    passport.authenticate('local', (err, user, info) => {
+        if (err) {
+            return next(err);
+        }
         if (!user) {
             return res.status(400).json({ 
-                message: 'Invalid email or password' 
+                message: info?.message || 'Invalid email or password' 
             });
         }
 
-        // 3. Check if account is active
-        if (!user.is_active) {
-            return res.status(403).json({ 
-                message: 'Your account has been deactivated' 
-            });
-        }
-
-        // Check if user signed up with Google
-        if (!user.password) {
-            return res.status(400).json({ 
-                message: 'This email is registered with Google. Please use Continue with Google.' 
-            });
-        }
-
-        // Check password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ 
-                message: 'Invalid email or password' 
-            });
-        }
-
-        // 5. Generate tokens
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        // 6. Store refresh token in sessions table
-        await pool.query(
-            `INSERT INTO sessions (user_id, refresh_token, expires_at) 
-             VALUES ($1, $2, NOW() + INTERVAL '30 days')`,
-            [user.id, refreshToken]
-        );
-
-        // 7. Send tokens in HTTP-only cookies
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 minutes
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-        });
-
-        // 8. Send response
-        return res.status(200).json({
-            message: 'Login successful',
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                profile_pic: user.profile_pic,
-                is_admin: user.is_admin,
-                is_active: user.is_active,
-                created_at: user.created_at
+        // Establish session
+        req.login(user, (err) => {
+            if (err) {
+                return next(err);
             }
+            return res.status(200).json({
+                message: 'Login successful',
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    profile_pic: user.profile_pic,
+                    is_admin: user.is_admin,
+                    is_active: user.is_active,
+                    created_at: user.created_at
+                }
+            });
         });
-
-    } catch (err) {
-        console.error('Login error:', err.message);
-        return res.status(500).json({ message: 'Server error' });
-    }
+    })(req, res, next);
 };
 
-
-
-
-
-export const refreshToken = async (req, res) => {
-    try {
-        // 1. Get refresh token from cookie
-        const token = req.cookies.refreshToken;
-        if (!token) {
-            return res.status(401).json({ 
-                message: 'No refresh token found' 
-            });
+// LOGOUT CONTROLLER
+export const logout = (req, res, next) => {
+    req.logout((err) => {
+        if (err) {
+            return next(err);
         }
-
-        // 2. Check if token exists in sessions table
-        const session = await pool.query(
-            `SELECT * FROM sessions WHERE refresh_token = $1`,
-            [token]
-        );
-        if (session.rows.length === 0) {
-            return res.status(401).json({ 
-                message: 'Invalid refresh token' 
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Session destroy error during logout:', err.message);
+            }
+            res.clearCookie('connect.sid', { path: '/' });
+            return res.status(200).json({ 
+                message: 'Logged out successfully' 
             });
-        }
-
-        // 3. Check if session is expired
-        if (new Date() > new Date(session.rows[0].expires_at)) {
-            await pool.query(
-                `DELETE FROM sessions WHERE refresh_token = $1`,
-                [token]
-            );
-            return res.status(401).json({ 
-                message: 'Refresh token expired, please login again' 
-            });
-        }
-
-        // 4. Verify refresh token
-        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-
-        // 5. Find user
-        const user = await findUserById(decoded.id);
-        if (!user) {
-            return res.status(401).json({ 
-                message: 'User not found' 
-            });
-        }
-
-        // 6. Generate new access token
-        const accessToken = generateAccessToken(user);
-
-        // 7. Send new access token in HTTP-only cookie
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 minutes
         });
-
-        return res.status(200).json({ 
-            message: 'Token refreshed successfully' 
-        });
-
-    } catch (err) {
-        console.error('Refresh token error:', err.message);
-        return res.status(401).json({ 
-            message: 'Invalid refresh token' 
-        });
-    }
+    });
 };
 
-
-
-
-export const logout = async (req, res) => {
-    try {
-        // 1. Get refresh token from cookie
-        const token = req.cookies.refreshToken;
-
-        if (token) {
-            // 2. Delete session from DB
-            await pool.query(
-                `DELETE FROM sessions WHERE refresh_token = $1`,
-                [token]
-            );
-        }
-
-        // 3. Clear cookies
-        res.clearCookie('accessToken', {
-            httpOnly: true,
-            sameSite: 'strict'
-        });
-        res.clearCookie('refreshToken', {
-            httpOnly: true,
-            sameSite: 'strict'
-        });
-
-        return res.status(200).json({ 
-            message: 'Logged out successfully' 
-        });
-
-    } catch (err) {
-        console.error('Logout error:', err.message);
-        return res.status(500).json({ message: 'Server error' });
-    }
-};
-
-
-
+// GOOGLE AUTH CALLBACK CONTROLLER
 export const googleAuthCallback = async (req, res) => {
     try {
-        const user = req.user;
-
-        // 1. Generate tokens
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        // 2. Store refresh token in sessions table
-        await pool.query(
-            `INSERT INTO sessions (user_id, refresh_token, expires_at)
-             VALUES ($1, $2, NOW() + INTERVAL '30 days')`,
-            [user.id, refreshToken]
-        );
-
-        // 3. Send tokens in cookies
-        res.cookie('accessToken', accessToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000
-        });
-
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'strict',
-            maxAge: 30 * 24 * 60 * 60 * 1000
-        });
-
-        // 4. Redirect to frontend callback page
-        res.redirect(
-            `${process.env.CLIENT_URL}/auth/success`
-        );
-
+        // Passport session is already established by this point
+        res.redirect(`${process.env.CLIENT_URL}/auth/success`);
     } catch (err) {
         console.error('Google callback error:', err.message);
         res.redirect(`${process.env.CLIENT_URL}/auth/failed`);

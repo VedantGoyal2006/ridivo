@@ -27,3 +27,9 @@ const start = async () => {
 };
 
 start();
+
+
+
+//  Initialize everything required before accepting requests.
+//  It does NOT contain business logic.
+//  It only starts the application.
