@@ -1,300 +1,63 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import RidivoLogo from "../components/RidivoLogo";
-import { getMyBookings, getMyRides } from '../services/rideService';
+import { getMyBookings, getMyRides, triggerSOS } from '../services/rideService';
+import {
+  Luggage,
+  Car,
+  Coins,
+  Star,
+  Search,
+  PlusCircle,
+  ClipboardList,
+  ShieldCheck,
+  TrendingUp,
+  MapPin,
+  Flag,
+  Calendar,
+  Users,
+  ChevronRight,
+  Ticket,
+} from "lucide-react";
 
-// ── NEW THEME: PREMIUM DARK GLASSMORPHISM ─────────────────────────────────────
 const theme = {
-  bgBase: "#0B1120",
-  glassCard: "rgba(255, 255, 255, 0.03)",
-  glassCardHeavy: "rgba(15, 23, 42, 0.6)",
-  glassHover: "rgba(255, 255, 255, 0.08)",
-  glassBorder: "rgba(255, 255, 255, 0.08)",
-  textPrimary: "#F8FAFC",
-  textSecondary: "#94A3B8",
-  accent: "#38BDF8", // Vibrant Sky Blue
-  accentHover: "#0284C7",
-  successBg: "rgba(16, 185, 129, 0.15)",
-  successText: "#34D399",
-  warningBg: "rgba(245, 158, 11, 0.15)",
-  warningText: "#FBBF24",
+  bgCard: "#FFFFFF",
+  border: "#E2E8F0",
+  textPrimary: "#093C5D",
+  textSecondary: "#6B7280",
+  textMuted: "#94A3B8",
+  accent: "#3B7597",
+  accentDark: "#093C5D",
+  accentLight: "#EFF6FF",
+  success: "#10B981",
+  successBg: "#EFFDF4",
+  successText: "#10B981",
+  warning: "#F59E0B",
+  warningBg: "#FEF3C7",
+  warningText: "#D97706",
+  danger: "#EF4444",
+  dangerBg: "#FEE2E2",
 };
 
-// ── DUMMY DATA (UNCHANGED) ────────────────────────────────────────────────────
-
-const notifications = [
-  { id: 1, text: "Rahul accepted your booking request", time: "2 min ago", read: false, icon: "✅" },
-  { id: 2, text: "Your ride to Indore is tomorrow at 8:30 AM", time: "1 hr ago", read: false, icon: "🚗" },
-  { id: 3, text: "Payment of ₹320 confirmed", time: "2 hrs ago", read: true, icon: "💰" },
-  { id: 4, text: "Kiran left you a 5★ review", time: "Yesterday", read: true, icon: "⭐" },
-];
-
-const navItems = [
-  { icon: "⊞", label: "Dashboard", path: "/dashboard" },
-  { icon: "🔍", label: "Find a Ride", path: "/rides" },
-  { icon: "➕", label: "Offer a Ride", path: "/rides?tab=post" },
-{ icon: "🚗", label: "My Rides", path: "/rides?tab=my" },
-  { icon: "📋", label: "Bookings", path: "/bookings" },
-  { icon: "💰", label: "Payments", path: "/payments" },
-  { icon: "⭐", label: "Reviews", path: "/reviews" },
-  { icon: "👤", label: "Profile", path: "/profile" },
-  { icon: "⚙️", label: "Settings", path: "/settings" },
-];
-
-// ── SIDEBAR ───────────────────────────────────────────────────────────────────
-function Sidebar({ activePath, onNavigate, user }) {
-  return (
-    <aside style={{
-      width: "240px", flexShrink: 0,
-      backgroundColor: "rgba(11, 17, 32, 0.75)",
-      backdropFilter: "blur(20px)",
-      borderRight: `1px solid ${theme.glassBorder}`,
-      height: "100vh", position: "fixed", left: 0, top: 0,
-      display: "flex", flexDirection: "column",
-      zIndex: 100, overflowY: "auto",
-    }}>
-      <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${theme.glassBorder}` }}>
-        <RidivoLogo size={34} showText={true} textColor="white" />
-      </div>
-
-      <nav style={{ padding: "16px 12px", flex: 1 }}>
-        {navItems.map((item) => (
-          <button key={item.label} onClick={() => onNavigate(item.path)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", gap: "12px",
-              padding: "11px 12px", borderRadius: "10px", border: "none",
-              backgroundColor: activePath === item.path ? "rgba(56, 189, 248, 0.15)" : "transparent",
-              color: activePath === item.path ? theme.textPrimary : theme.textSecondary,
-              cursor: "pointer", fontSize: "14px", fontWeight: activePath === item.path ? "600" : "400",
-              fontFamily: "'DM Sans', sans-serif", textAlign: "left",
-              transition: "all 0.2s ease", marginBottom: "2px",
-              borderLeft: activePath === item.path ? `3px solid ${theme.accent}` : "3px solid transparent",
-            }}
-            onMouseEnter={(e) => { if (activePath !== item.path) { e.currentTarget.style.backgroundColor = theme.glassHover; e.currentTarget.style.color = theme.textPrimary; } }}
-            onMouseLeave={(e) => { if (activePath !== item.path) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = theme.textSecondary; } }}
-          >
-            <span style={{ fontSize: "16px", width: "20px", textAlign: "center", filter: activePath === item.path ? "drop-shadow(0 0 8px rgba(56,189,248,0.5))" : "none" }}>{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-      </nav>
-
-      <div style={{ margin: "12px", borderRadius: "14px", background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(2,132,199,0.4))", backdropFilter: "blur(10px)", border: `1px solid rgba(56,189,248,0.3)`, padding: "16px", marginBottom: "20px" }}>
-        <div style={{ fontSize: "20px", marginBottom: "6px" }}>🚗</div>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "13px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px" }}>Got Empty Seats?</div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: "rgba(255,255,255,0.7)", marginBottom: "12px" }}>Share your ride and split the cost</div>
-        <button style={{
-          width: "100%", padding: "8px", backgroundColor: theme.accent,
-          color: "#fff", border: "none", borderRadius: "8px",
-          fontSize: "12px", fontWeight: "700", cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif", transition: "0.2s",
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.accentHover}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.accent}
-        >Offer a Ride</button>
-      </div>
-    </aside>
-  );
-}
-
-// ── TOP NAVBAR ────────────────────────────────────────────────────────────────
-function TopNav({ user, notifications, onLogout, onNavigate }) {
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const unread = notifications.filter(n => !n.read).length;
-
-  return (
-    <header style={{
-      height: "64px", backgroundColor: theme.glassCardHeavy,
-      backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-      borderBottom: `1px solid ${theme.glassBorder}`,
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 32px", position: "sticky", top: 0, zIndex: 50,
-      boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-    }}>
-      <div>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "700", color: theme.textPrimary }}>
-          Welcome back, {user?.name?.split(' ')[0] || 'User'}! 👋
-        </div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>
-          Ready for your next journey?
-        </div>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        {/* Search */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", backgroundColor: "rgba(0,0,0,0.3)", border: `1px solid ${theme.glassBorder}`, borderRadius: "10px", padding: "8px 14px" }}>
-          <span style={{ color: theme.textSecondary, fontSize: "14px" }}>🔍</span>
-          <input placeholder="Search rides..." style={{ border: "none", outline: "none", backgroundColor: "transparent", fontSize: "13px", color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif", width: "160px" }} />
-        </div>
-
-        {/* Notifications */}
-        <div style={{ position: "relative" }}>
-          <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); }} style={{
-            position: "relative", width: "40px", height: "40px",
-            backgroundColor: "rgba(0,0,0,0.3)", border: `1px solid ${theme.glassBorder}`,
-            borderRadius: "10px", cursor: "pointer", fontSize: "18px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.2s ease", color: theme.textPrimary
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.glassHover; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.3)"; }}
-          >
-            🔔
-            {unread > 0 && (
-              <div style={{
-                position: "absolute", top: "-4px", right: "-4px",
-                width: "18px", height: "18px", backgroundColor: "#EF4444",
-                borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "10px", fontWeight: "700", color: "white",
-                fontFamily: "'DM Sans', sans-serif", border: `2px solid ${theme.bgBase}`,
-              }}>{unread}</div>
-            )}
-          </button>
-
-          {notifOpen && (
-            <div style={{
-              position: "absolute", top: "calc(100% + 8px)", right: 0,
-              backgroundColor: theme.glassCardHeavy, backdropFilter: "blur(24px)",
-              borderRadius: "16px", width: "320px",
-              boxShadow: "0 12px 40px rgba(0,0,0,0.4)", border: `1px solid ${theme.glassBorder}`,
-              zIndex: 100, overflow: "hidden", animation: "fadeInDown 0.2s ease",
-            }}>
-              <div style={{ padding: "16px 20px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>Notifications</span>
-                <span style={{ fontSize: "12px", color: theme.accent, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", fontWeight: "600" }}>Mark all read</span>
-              </div>
-              {notifications.map((n) => (
-                <div key={n.id} style={{
-                  padding: "14px 20px", display: "flex", gap: "12px", alignItems: "flex-start",
-                  backgroundColor: n.read ? "transparent" : "rgba(56, 189, 248, 0.05)",
-                  borderBottom: `1px solid ${theme.glassBorder}`,
-                  transition: "background 0.2s",
-                }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = n.read ? "transparent" : "rgba(56, 189, 248, 0.05)"}
-                >
-                  <span style={{ fontSize: "20px", flexShrink: 0 }}>{n.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textPrimary, lineHeight: "1.5", marginBottom: "4px" }}>{n.text}</div>
-                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>{n.time}</div>
-                  </div>
-                  {!n.read && <div style={{ width: "8px", height: "8px", backgroundColor: theme.accent, borderRadius: "50%", flexShrink: 0, marginTop: "4px", boxShadow: `0 0 8px ${theme.accent}` }} />}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Profile */}
-        <div style={{ position: "relative" }}>
-          <button onClick={() => {setProfileOpen(!profileOpen); setNotifOpen(false); }} 
-          style={{
-            display: "flex", alignItems: "center", gap: "10px",
-            backgroundColor: "rgba(0,0,0,0.3)", border: `1px solid ${theme.glassBorder}`,
-            borderRadius: "10px", padding: "6px 12px 6px 6px",
-            cursor: "pointer", transition: "all 0.2s ease",
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.glassHover; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.3)"; }}
-          >
-            {user?.profile_pic ? (
-              <img src={user.profile_pic} alt="Profile" style={{ width: "30px", height: "30px", borderRadius: "8px", objectFit: "cover" }} />
-            ) : (
-              <div style={{ width: "30px", height: "30px", borderRadius: "8px", background: "linear-gradient(135deg, #38BDF8, #0284C7)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif" }}>
-                {user?.name?.[0] || 'U'}
-              </div>
-            )}
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{user?.name?.split(' ')[0] || 'User'}</div>
-            </div>
-            <span style={{ color: theme.textSecondary, fontSize: "12px", transform: profileOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>▾</span>
-          </button>
-
-          {profileOpen && (
-            <div style={{
-              position: "absolute", top: "calc(100% + 8px)", right: 0,
-              backgroundColor: theme.glassCardHeavy, backdropFilter: "blur(24px)",
-              borderRadius: "16px", width: "220px",
-              boxShadow: "0 12px 40px rgba(0,0,0,0.4)", border: `1px solid ${theme.glassBorder}`,
-              zIndex: 100, overflow: "hidden", animation: "fadeInDown 0.2s ease",
-            }}>
-              <div style={{ padding: "16px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", alignItems: "center", gap: "12px" }}>
-                {user?.profile_pic ? (
-                  <img src={user.profile_pic} alt="Profile" style={{ width: "40px", height: "40px", borderRadius: "10px", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "linear-gradient(135deg, #38BDF8, #0284C7)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "16px", fontWeight: "700" }}>
-                    {user?.name?.[0] || 'U'}
-                  </div>
-                )}
-                <div>
-                  <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary }}>{user?.name || 'User'}</div>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>{user?.email || ''}</div>
-                </div>
-              </div>
-
-              {[
-                { icon: "👤", label: "My Profile", path: "/profile" },
-                { icon: "🚗", label: "My Rides", path: "/my-rides" },
-                { icon: "📋", label: "My Bookings", path: "/bookings" },
-                { icon: "🛡️", label: "Become a Driver", path: "/verify" },
-                { icon: "⚙️", label: "Settings", path: "/settings" },
-              ].map((item) => (
-                <button key={item.path} 
-                onClick={() => {onNavigate(item.path); navigate(item.path); setProfileOpen(false); }}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                  padding: "11px 16px", border: "none", backgroundColor: "transparent",
-                  cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "13.5px", color: theme.textPrimary, textAlign: "left",
-                  transition: "background 0.15s",
-                }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                >
-                  <span>{item.icon}</span> {item.label}
-                </button>
-              ))}
-
-              <div style={{ borderTop: `1px solid ${theme.glassBorder}`, padding: "8px" }}>
-                <button onClick={onLogout} style={{
-                  width: "100%", padding: "10px 16px", border: "none",
-                  backgroundColor: "rgba(239, 68, 68, 0.1)", borderRadius: "8px",
-                  cursor: "pointer", color: "#FCA5A5",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px",
-                  fontWeight: "600", display: "flex", alignItems: "center", gap: "8px",
-                  transition: "background 0.2s",
-                }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)"}
-                >
-                  🚪 Sign Out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
-
 // ── STAT CARD ─────────────────────────────────────────────────────────────────
-function StatCard({ icon, label, value, sub, color, bg }) {
+function StatCard({ icon: IconComponent, label, value, sub, color, bg }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={{
-      backgroundColor: theme.glassCard, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-      borderRadius: "16px", padding: "20px 22px",
-      border: `1px solid ${theme.glassBorder}`, transition: "all 0.3s ease",
-      display: "flex", alignItems: "center", gap: "16px",
-      boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)"
-    }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 8px 30px ${bg.replace('0.1', '0.2')}`; e.currentTarget.style.borderColor = color; e.currentTarget.style.backgroundColor = theme.glassHover; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 30px rgba(0, 0, 0, 0.1)"; e.currentTarget.style.borderColor = theme.glassBorder; e.currentTarget.style.backgroundColor = theme.glassCard; }}
+    <div 
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        backgroundColor: theme.bgCard,
+        borderRadius: "16px", padding: "20px 22px",
+        border: `1px solid ${hovered ? color : theme.border}`,
+        transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
+        display: "flex", alignItems: "center", gap: "16px",
+        boxShadow: hovered ? "0 10px 30px rgba(9, 60, 93, 0.06)" : "0 4px 20px rgba(9, 60, 93, 0.01)",
+        transform: hovered ? "translateY(-4px)" : "translateY(0)"
+      }}
     >
-      <div style={{ width: "52px", height: "52px", borderRadius: "14px", backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0, boxShadow: `inset 0 0 10px ${color}` }}>
-        {icon}
+      <div style={{ width: "52px", height: "52px", borderRadius: "14px", backgroundColor: bg, display: "flex", alignItems: "center", justifyContent: "center", color: color, flexShrink: 0 }}>
+        <IconComponent size={24} />
       </div>
       <div>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "24px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>{value}</div>
@@ -305,150 +68,207 @@ function StatCard({ icon, label, value, sub, color, bg }) {
   );
 }
 
-// ── SEARCH BAR ────────────────────────────────────────────────────────────────
+// ── SEARCH SECTION ────────────────────────────────────────────────────────────
 function SearchSection() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("find");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  const handleSearchClick = () => {
+    if (tab === "find") {
+      navigate(`/rides?origin=${from}&destination=${to}`);
+    } else {
+      navigate(`/rides?tab=post&origin=${from}&destination=${to}`);
+    }
+  };
+
   return (
     <div style={{
       borderRadius: "20px", overflow: "hidden",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-      border: `1px solid ${theme.glassBorder}`,
+      boxShadow: "0 10px 30px rgba(9, 60, 93, 0.03)",
+      border: `1px solid ${theme.border}`,
       marginBottom: "32px",
-      backgroundColor: theme.glassCard,
-      backdropFilter: "blur(16px)",
-      WebkitBackdropFilter: "blur(16px)"
+      backgroundColor: theme.bgCard,
     }}>
       <div style={{
-        background: `linear-gradient(135deg, rgba(11,17,32,0.8) 0%, rgba(15,23,42,0.6) 100%), url('/src/assets/hero.jpg') center/cover`,
-        padding: "24px 28px 0", borderBottom: `1px solid ${theme.glassBorder}`
+        background: `linear-gradient(135deg, rgba(9,60,93,0.95) 0%, rgba(59,117,151,0.9) 100%), url('/src/assets/hero.jpg') center/cover`,
+        padding: "24px 28px 0", borderBottom: `1px solid ${theme.border}`
       }}>
         <div style={{ display: "flex", gap: "4px", marginBottom: "0" }}>
-          {[{ id: "find", label: "🔍 Find a Ride" }, { id: "offer", label: "🚗 Offer a Ride" }].map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: "10px 20px", border: "none", cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif", fontSize: "14px", fontWeight: "600",
-              borderRadius: "10px 10px 0 0", transition: "all 0.2s ease",
-              backgroundColor: tab === t.id ? "rgba(255,255,255,0.1)" : "transparent",
-              color: tab === t.id ? theme.textPrimary : theme.textSecondary,
-              backdropFilter: tab === t.id ? "blur(10px)" : "none",
-            }}>
-              {t.label}
-            </button>
-          ))}
+          {[
+            { id: "find", label: "Find a Ride", icon: Search },
+            { id: "offer", label: "Offer a Ride", icon: Car }
+          ].map((t) => {
+            const IconComp = t.icon;
+            const isActive = tab === t.id;
+            return (
+              <button 
+                key={t.id} 
+                onClick={() => setTab(t.id)} 
+                style={{
+                  padding: "12px 24px", border: "none", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "14px", fontWeight: "600",
+                  borderRadius: "12px 12px 0 0", transition: "all 0.2s ease",
+                  backgroundColor: isActive ? theme.bgCard : "transparent",
+                  color: isActive ? theme.textPrimary : "rgba(255, 255, 255, 0.7)",
+                  display: "flex", alignItems: "center", gap: "8px"
+                }}
+              >
+                <IconComp size={15} style={{ color: isActive ? theme.textPrimary : "rgba(255, 255, 255, 0.7)" }} />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div style={{ padding: "24px 28px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: "16px", alignItems: "end" }}>
+      <div style={{ padding: "28px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 120px auto", gap: "16px", alignItems: "end" }}>
         {[
-          { label: "From", placeholder: "Leaving from", value: from, onChange: setFrom, icon: "📍" },
-          { label: "To", placeholder: "Going to", value: to, onChange: setTo, icon: "🏁" },
-        ].map((f) => (
-          <div key={f.label}>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontFamily: "'DM Sans', sans-serif" }}>{f.label}</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", border: `1px solid ${theme.glassBorder}`, borderRadius: "10px", padding: "10px 12px", backgroundColor: "rgba(0,0,0,0.3)" }}>
-              <span>{f.icon}</span>
-              <input value={f.value} onChange={(e) => f.onChange(e.target.value)} placeholder={f.placeholder} style={{ border: "none", outline: "none", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: theme.textPrimary, width: "100%", background: "transparent" }} />
+          { label: "From", placeholder: "Leaving from", value: from, onChange: setFrom, icon: MapPin },
+          { label: "To", placeholder: "Going to", value: to, onChange: setTo, icon: Flag },
+        ].map((f) => {
+          const IconComp = f.icon;
+          return (
+            <div key={f.label}>
+              <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'DM Sans', sans-serif" }}>{f.label}</label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", border: `1px solid ${theme.border}`, borderRadius: "12px", padding: "12px 14px", backgroundColor: "#F9FAFB" }}>
+                <IconComp size={16} style={{ color: theme.textSecondary }} />
+                <input value={f.value} onChange={(e) => f.onChange(e.target.value)} placeholder={f.placeholder} style={{ border: "none", outline: "none", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: theme.textPrimary, width: "100%", background: "transparent" }} />
+              </div>
             </div>
+          );
+        })}
+        <div>
+          <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'DM Sans', sans-serif" }}>Date</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", border: `1px solid ${theme.border}`, borderRadius: "12px", padding: "12px 14px", backgroundColor: "#F9FAFB" }}>
+            <Calendar size={16} style={{ color: theme.textSecondary }} />
+            <input type="date" style={{ width: "100%", border: "none", outline: "none", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: theme.textPrimary, background: "transparent" }} />
           </div>
-        ))}
-        <div>
-          <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontFamily: "'DM Sans', sans-serif" }}>Date</label>
-          <input type="date" style={{ width: "100%", border: `1px solid ${theme.glassBorder}`, borderRadius: "10px", padding: "10px 12px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: theme.textPrimary, background: "rgba(0,0,0,0.3)", colorScheme: "dark" }} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: theme.textSecondary, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontFamily: "'DM Sans', sans-serif" }}>Seats</label>
-          <select style={{ width: "100%", border: `1px solid ${theme.glassBorder}`, borderRadius: "10px", padding: "10px 12px", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", outline: "none", color: theme.textPrimary, background: "rgba(0,0,0,0.3)" }}>
-            {[1, 2, 3, 4].map(n => <option key={n} style={{background: theme.bgBase}}>{n} Seat{n > 1 ? "s" : ""}</option>)}
-          </select>
+          <label style={{ display: "block", fontSize: "11px", fontWeight: "700", color: theme.textSecondary, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.8px", fontFamily: "'DM Sans', sans-serif" }}>Seats</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", border: `1px solid ${theme.border}`, borderRadius: "12px", padding: "12px 14px", backgroundColor: "#F9FAFB" }}>
+            <Users size={16} style={{ color: theme.textSecondary }} />
+            <select style={{ width: "100%", border: "none", outline: "none", fontSize: "14px", fontFamily: "'DM Sans', sans-serif", color: theme.textPrimary, background: "transparent", cursor: "pointer" }}>
+              {[1, 2, 3, 4].map(n => <option key={n}>{n} Seat{n > 1 ? "s" : ""}</option>)}
+            </select>
+          </div>
         </div>
-        <button style={{
-          backgroundColor: theme.accent, color: "white", border: "none",
-          borderRadius: "12px", padding: "12px 24px", fontSize: "14px",
-          fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-          whiteSpace: "nowrap", transition: "all 0.2s ease",
-          boxShadow: `0 4px 20px rgba(56, 189, 248, 0.4)`,
-        }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.accentHover; e.currentTarget.style.transform = "translateY(-1px)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.accent; e.currentTarget.style.transform = "translateY(0)"; }}
-        >Search Rides</button>
+        <button 
+          onClick={handleSearchClick}
+          style={{
+            backgroundColor: theme.textPrimary, color: "white", border: "none",
+            borderRadius: "12px", padding: "14px 24px", fontSize: "14px",
+            fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            whiteSpace: "nowrap", transition: "all 0.2s ease",
+            boxShadow: `0 4px 12px rgba(9, 60, 93, 0.15)`,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#07304b"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.textPrimary; e.currentTarget.style.transform = "translateY(0)"; }}
+        >
+          {tab === "find" ? "Search" : "Post"}
+        </button>
       </div>
     </div>
   );
 }
 
 // ── UPCOMING RIDES ────────────────────────────────────────────────────────────
-function UpcomingRides({ bookings }) {
-  const upcoming = bookings.filter(b => 
-    ['PENDING', 'CONFIRMED'].includes(b.status)
-  );
+function UpcomingRides({ bookings, onSOS }) {
+  const navigate = useNavigate();
+  const upcoming = bookings.filter(b => ['PENDING', 'CONFIRMED'].includes(b.status));
 
   return (
-    <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, overflow: "hidden", marginBottom: "24px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>Upcoming Rides</div>
-        <button style={{ background: "none", border: "none", color: theme.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View all →</button>
+    <div style={{ backgroundColor: theme.bgCard, borderRadius: "20px", border: `1px solid ${theme.border}`, overflow: "hidden", marginBottom: "24px", boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)" }}>
+      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>Upcoming Journeys</div>
+        <button onClick={() => navigate("/bookings")} style={{ background: "none", border: "none", color: theme.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View all →</button>
       </div>
 
       {upcoming.length === 0 ? (
-        <div style={{ padding: '24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
-          No upcoming rides
+        <div style={{ padding: '40px 24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ color: theme.textMuted, marginBottom: "12px" }}>
+            <Ticket size={32} />
+          </div>
+          <div style={{ fontSize: "14px", fontWeight: "500", color: theme.textSecondary }}>No upcoming journeys scheduled</div>
+          <button onClick={() => navigate("/rides")} style={{ border: "none", background: "none", color: theme.accentDark, fontSize: "13px", fontWeight: "700", marginTop: "12px", cursor: "pointer" }}>Find a Ride now</button>
         </div>
       ) : upcoming.map((booking, i) => (
         <div key={booking.id} style={{
           padding: "20px 24px", display: "grid",
-          gridTemplateColumns: "60px 1fr 1fr auto",
+          gridTemplateColumns: "70px 1fr 1fr auto",
           gap: "16px", alignItems: "center",
-          borderBottom: i < upcoming.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
+          borderBottom: i < upcoming.length - 1 ? `1px solid ${theme.border}` : "none",
           transition: "background 0.2s",
         }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.accentLight}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
-          <div style={{ textAlign: "center", backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "12px", padding: "10px 8px", border: `1px solid ${theme.glassBorder}` }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "22px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>
+          <div style={{ textAlign: "center", backgroundColor: theme.accentLight, borderRadius: "12px", padding: "10px 8px", border: `1px solid rgba(59, 117, 151, 0.1)` }}>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "20px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>
               {new Date(booking.departure_time).getDate()}
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.accent, fontWeight: "600" }}>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.accent, fontWeight: "700", textTransform: "uppercase", marginTop: "2px" }}>
               {new Date(booking.departure_time).toLocaleString('default', { month: 'short' })}
-            </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: theme.textSecondary }}>
-              {new Date(booking.departure_time).toLocaleString('default', { weekday: 'short' })}
             </div>
           </div>
 
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{booking.origin}</span>
-              <span style={{ color: theme.textSecondary, fontSize: "14px" }}>→</span>
-              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{booking.destination}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary }}>{booking.origin}</span>
+              <span style={{ color: theme.textSecondary, fontSize: "12px" }}>→</span>
+              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary }}>{booking.destination}</span>
             </div>
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>
-              {new Date(booking.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {booking.seats_booked} seat{booking.seats_booked > 1 ? "s" : ""} booked
+              {new Date(booking.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {booking.seats_booked} seat{booking.seats_booked > 1 ? "s" : ""}
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "#F59E0B", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "13px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif", flexShrink: 0, boxShadow: "0 2px 10px rgba(0,0,0,0.3)" }}>
+            <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary, fontSize: "14px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif", flexShrink: 0, border: `1px solid ${theme.border}` }}>
               {booking.driver_name?.[0] || 'D'}
             </div>
             <div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", fontWeight: "600", color: theme.textPrimary }}>{booking.driver_name}</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>⭐ {booking.avg_rating} · {booking.vehicle_name}</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary, display: "flex", alignItems: "center", gap: "4px" }}>
+                <Star size={11} fill="#FCD34D" stroke="#FCD34D" />
+                <span>{booking.avg_rating} · {booking.vehicle_name}</span>
+              </div>
             </div>
           </div>
 
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: theme.textPrimary, marginBottom: "6px" }}>₹{booking.total_fare}</div>
-            <div style={{
-              display: "inline-block", padding: "3px 10px", borderRadius: "100px",
-              backgroundColor: booking.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
-              color: booking.status === "CONFIRMED" ? theme.successText : theme.warningText,
-              fontSize: "11px", fontWeight: "600", fontFamily: "'DM Sans', sans-serif",
-              border: `1px solid ${booking.status === "CONFIRMED" ? theme.successText : theme.warningText}`
-            }}>{booking.status}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "800", color: theme.textPrimary, marginBottom: "4px" }}>₹{booking.total_fare}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end" }}>
+              <div style={{
+                display: "inline-block", padding: "3px 10px", borderRadius: "100px",
+                backgroundColor: booking.status === "CONFIRMED" ? theme.successBg : theme.warningBg,
+                color: booking.status === "CONFIRMED" ? theme.successText : theme.warningText,
+                fontSize: "10px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
+                border: `1px solid ${booking.status === "CONFIRMED" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
+              }}>{booking.status}</div>
+
+              {booking.status === 'CONFIRMED' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSOS(booking);
+                  }}
+                  style={{
+                    padding: "3px 8px", borderRadius: "6px",
+                    backgroundColor: theme.dangerBg, color: theme.danger,
+                    border: `1px solid rgba(239, 68, 68, 0.2)`,
+                    fontSize: "10px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
+                    cursor: "pointer", transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.dangerBg}
+                >
+                  🚨 SOS Alert
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ))}
@@ -457,46 +277,121 @@ function UpcomingRides({ bookings }) {
 }
 
 // ── RECENT ACTIVITY ───────────────────────────────────────────────────────────
-function RecentActivity({ bookings }) {
-  const recent = bookings.slice(0, 4);
+function RecentActivity({ bookings = [], rides = [] }) {
+  const navigate = useNavigate();
+
+  const combined = [
+    ...bookings.map(b => ({
+      id: b.id,
+      origin: b.origin,
+      destination: b.destination,
+      created_at: b.created_at,
+      status: b.status,
+      fare: b.total_fare,
+      type: 'BOOKING',
+    })),
+    ...rides.map(r => {
+      const bookedSeats = r.total_seats - r.available_seats;
+      return {
+        id: r.id,
+        origin: r.origin,
+        destination: r.destination,
+        created_at: r.created_at,
+        status: r.status,
+        fare: parseFloat(r.total_trip_cost) || (parseFloat(r.price_per_seat) * r.total_seats),
+        type: 'RIDE_OFFER',
+        bookedSeats,
+        totalSeats: r.total_seats
+      };
+    })
+  ];
+
+  const recent = combined
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 5);
+
+  const getStatusColor = (status) => {
+    if (['CONFIRMED', 'ACTIVE', 'COMPLETED'].includes(status)) return theme.success;
+    if (['PENDING', 'ONGOING'].includes(status)) return theme.warningText || '#D97706';
+    return theme.danger;
+  };
 
   return (
-    <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.glassBorder}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div style={{ backgroundColor: theme.bgCard, borderRadius: "20px", border: `1px solid ${theme.border}`, overflow: "hidden", boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)" }}>
+      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>Recent Activity</div>
-        <button style={{ background: "none", border: "none", color: theme.accent, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>View all →</button>
       </div>
 
       {recent.length === 0 ? (
         <div style={{ padding: '24px', textAlign: 'center', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
           No recent activity
         </div>
-      ) : recent.map((booking, i) => (
-        <div key={booking.id} style={{
-          padding: "14px 24px", display: "flex", alignItems: "center", gap: "14px",
-          borderBottom: i < recent.length - 1 ? `1px solid ${theme.glassBorder}` : "none",
-          transition: "background 0.2s",
-        }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.glassHover}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-        >
-          <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "rgba(255,255,255,0.05)", border: `1px solid ${theme.glassBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>
-            🧳
+      ) : (
+        <>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {recent.map((activity, i) => {
+              const isBooking = activity.type === 'BOOKING';
+              return (
+                <div 
+                  key={activity.id} 
+                  onClick={() => navigate(isBooking ? '/bookings?tab=my' : '/bookings?tab=driver')}
+                  style={{
+                    padding: "14px 24px", display: "flex", alignItems: "center", gap: "14px",
+                    borderBottom: i < recent.length - 1 ? `1px solid ${theme.border}` : "none",
+                    transition: "all 0.2s ease",
+                    cursor: "pointer"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.accentLight}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                >
+                  <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: theme.bgBase, border: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary, flexShrink: 0 }}>
+                    {isBooking ? <Luggage size={16} /> : <Car size={16} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>
+                      {activity.origin} → {activity.destination}
+                    </div>
+                    <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>
+                      {new Date(activity.created_at).toLocaleDateString()} · {
+                        isBooking 
+                          ? `Booking request ${activity.status.toLowerCase()}` 
+                          : `Offered ride (${activity.status.toLowerCase()})`
+                      }
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "800", color: theme.textPrimary }}>₹{activity.fare}</div>
+                    <div style={{ 
+                      fontFamily: "'DM Sans', sans-serif", 
+                      fontSize: "11px", 
+                      color: isBooking ? getStatusColor(activity.status) : theme.accent, 
+                      fontWeight: "600" 
+                    }}>
+                      {isBooking ? activity.status : `${activity.bookedSeats}/${activity.totalSeats} booked`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px", fontWeight: "600", color: theme.textPrimary }}>
-              {booking.origin} → {booking.destination}
+          {combined.length > 5 && (
+            <div style={{ padding: "12px 24px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", backgroundColor: "#FCFDFE" }}>
+              <button 
+                onClick={() => navigate('/bookings?tab=my')}
+                style={{ background: "none", border: "none", color: theme.accent, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Show More Bookings →
+              </button>
+              <button 
+                onClick={() => navigate('/bookings?tab=driver')}
+                style={{ background: "none", border: "none", color: theme.accent, fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Show More Ride Requests →
+              </button>
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.textSecondary }}>
-              {new Date(booking.created_at).toLocaleDateString()} · Ride taken
-            </div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: "#34D399" }}>₹{booking.total_fare}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "11px", color: theme.successText }}>{booking.status}</div>
-          </div>
-        </div>
-      ))}
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -504,32 +399,31 @@ function RecentActivity({ bookings }) {
 // ── RIGHT PANEL ───────────────────────────────────────────────────────────────
 function RightPanel({ user, navigate }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Profile card */}
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      {/* Profile summary card */}
       <div style={{
-        background: `linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(2,132,199,0.3) 100%)`,
-        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        background: `linear-gradient(135deg, ${theme.accentDark} 0%, ${theme.accent} 100%)`,
         borderRadius: "20px", padding: "24px", color: "white", position: "relative", overflow: "hidden",
-        border: `1px solid rgba(56,189,248,0.3)`, boxShadow: "0 8px 32px rgba(0,0,0,0.3)"
+        boxShadow: "0 8px 24px rgba(9, 60, 93, 0.15)"
       }}>
-        <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "120px", height: "120px", background: "radial-gradient(circle, rgba(56,189,248,0.4), transparent)", borderRadius: "50%" }} />
+        <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "120px", height: "120px", background: "radial-gradient(circle, rgba(255,255,255,0.15), transparent)", borderRadius: "50%" }} />
         <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "20px", position: "relative" }}>
           {user?.profile_pic ? (
-            <img src={user.profile_pic} alt="Profile" style={{ width: "52px", height: "52px", borderRadius: "14px", objectFit: "cover", border: "2px solid rgba(255,255,255,0.3)" }} />
+            <img src={user.profile_pic} alt="Profile" style={{ width: "52px", height: "52px", borderRadius: "14px", objectFit: "cover", border: "2px solid rgba(255,255,255,0.2)" }} />
           ) : (
-            <div style={{ width: "52px", height: "52px", borderRadius: "14px", backgroundColor: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: "700", border: `1px solid ${theme.glassBorder}` }}>
+            <div style={{ width: "52px", height: "52px", borderRadius: "14px", backgroundColor: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", fontWeight: "700" }}>
               {user?.name?.[0] || 'U'}
             </div>
           )}
           <div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: theme.textPrimary }}>{user?.name || 'User'}</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "rgba(255,255,255,0.8)" }}>{user?.email || ''}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "16px", fontWeight: "700", color: "#FFFFFF" }}>{user?.name || 'User'}</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: "rgba(255,255,255,0.75)" }}>{user?.email || ''}</div>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", position: "relative" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", position: "relative" }}>
           {[["12", "Rides"], ["3", "Offered"], ["4.8★", "Rating"]].map(([val, label]) => (
-            <div key={label} style={{ textAlign: "center", backgroundColor: "rgba(0,0,0,0.2)", border: `1px solid ${theme.glassBorder}`, borderRadius: "10px", padding: "10px 8px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: theme.textPrimary }}>{val}</div>
+            <div key={label} style={{ textAlign: "center", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: "12px", padding: "10px 8px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: "#FFFFFF" }}>{val}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: "rgba(255,255,255,0.7)" }}>{label}</div>
             </div>
           ))}
@@ -537,40 +431,43 @@ function RightPanel({ user, navigate }) {
       </div>
 
       {/* Quick actions */}
-      <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, padding: "20px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+      <div style={{ backgroundColor: theme.bgCard, borderRadius: "20px", border: `1px solid ${theme.border}`, padding: "24px", boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)" }}>
         <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary, marginBottom: "16px" }}>Quick Actions</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        {[
-    { icon: "🔍", label: "Find Ride", bg: "rgba(56, 189, 248, 0.1)", border: "rgba(56, 189, 248, 0.3)", textColor: "#38BDF8", path: "/rides" },
-    { icon: "🚗", label: "Offer Ride", bg: "rgba(52, 211, 153, 0.1)", border: "rgba(52, 211, 153, 0.3)", textColor: "#34D399", path: "/rides" },
-    { icon: "📋", label: "Bookings", bg: "rgba(251, 191, 36, 0.1)", border: "rgba(251, 191, 36, 0.3)", textColor: "#FBBF24", path: "/bookings" },
-    { icon: "🛡️", label: "Verify", bg: "rgba(167, 139, 250, 0.1)", border: "rgba(167, 139, 250, 0.3)", textColor: "#A78BFA", path: "/profile" },
-].map((action) => (
-    <button key={action.label} onClick={() => navigate(action.path)} style={{
-              padding: "14px 10px", borderRadius: "12px", border: `1px solid ${action.border}`,
-              backgroundColor: action.bg, cursor: "pointer",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
-              transition: "all 0.2s ease",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${action.bg}`; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-            >
-              <span style={{ fontSize: "22px" }}>{action.icon}</span>
-              <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "600", color: action.textColor }}>{action.label}</span>
-            </button>
-          ))}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          {[
+            { icon: Search, label: "Find Ride", bg: theme.accentLight, border: "rgba(59,117,151,0.1)", textColor: theme.accentDark, path: "/rides" },
+            { icon: PlusCircle, label: "Offer Ride", bg: theme.successBg, border: "rgba(16,185,129,0.1)", textColor: theme.success, path: "/rides?tab=post" },
+            { icon: ClipboardList, label: "Bookings", bg: theme.warningBg, border: "rgba(245,158,11,0.1)", textColor: theme.warningText, path: "/bookings" },
+            { icon: ShieldCheck, label: "Verify", bg: "rgba(167, 139, 250, 0.08)", border: "rgba(167, 139, 250, 0.15)", textColor: "#7C3AED", path: "/verify" },
+          ].map((action) => {
+            const IconComp = action.icon;
+            return (
+              <button key={action.label} onClick={() => navigate(action.path)} style={{
+                padding: "16px 10px", borderRadius: "14px", border: `1px solid ${action.border}`,
+                backgroundColor: action.bg, cursor: "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+                transition: "all 0.2s ease",
+              }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 16px ${action.bg}`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <IconComp size={24} style={{ color: action.textColor }} />
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", fontWeight: "600", color: action.textColor }}>{action.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Savings card */}
-      <div style={{ backgroundColor: theme.glassCard, backdropFilter: "blur(16px)", borderRadius: "20px", border: `1px solid ${theme.glassBorder}`, padding: "20px", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary, marginBottom: "16px" }}>My Savings</div>
+      {/* Savings tracker */}
+      <div style={{ backgroundColor: theme.bgCard, borderRadius: "20px", border: `1px solid ${theme.border}`, padding: "24px", boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)" }}>
+        <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary, marginBottom: "16px" }}>Monthly Savings</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textSecondary }}>Total Saved</span>
-          <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "20px", fontWeight: "800", color: theme.successText }}>₹2,450</span>
+          <span style={{ fontFamily: "'Sora', sans-serif", fontSize: "20px", fontWeight: "800", color: theme.success }}>₹2,450</span>
         </div>
-        <div style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: "8px", height: "6px", marginBottom: "12px", border: `1px solid ${theme.glassBorder}` }}>
-          <div style={{ width: "68%", height: "100%", borderRadius: "8px", background: `linear-gradient(to right, ${theme.accent}, ${theme.successText})`, boxShadow: `0 0 10px ${theme.successText}` }} />
+        <div style={{ backgroundColor: theme.bgBase, borderRadius: "8px", height: "6px", marginBottom: "12px", border: `1px solid ${theme.border}` }}>
+          <div style={{ width: "68%", height: "100%", borderRadius: "8px", backgroundColor: theme.success }} />
         </div>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12px", color: theme.textSecondary }}>68% saved vs solo travel this month 🎉</div>
       </div>
@@ -580,9 +477,8 @@ function RightPanel({ user, navigate }) {
 
 // ── MAIN DASHBOARD ────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [activePath, setActivePath] = useState("/dashboard");
   const [loaded, setLoaded] = useState(false);
   const [myBookings, setMyBookings] = useState([]);
   const [myRides, setMyRides] = useState([]);
@@ -591,127 +487,199 @@ export default function Dashboard() {
     ridesOffered: 0,
   });
 
- useEffect(() => {
+  // SOS State Variables
+  const [sosBooking, setSosBooking] = useState(null);
+  const [sosConfirmOpen, setSosConfirmOpen] = useState(false);
+  const [sosLoading, setSosLoading] = useState(false);
+  const [sosAlertText, setSosAlertText] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleSOS = (booking) => {
+      setSosBooking(booking);
+      setSosConfirmOpen(true);
+      setSosAlertText('');
+      setError('');
+      setSuccess('');
+  };
+
+  const confirmSOS = async () => {
+      if (!sosBooking) return;
+      setSosLoading(true);
+      setError('');
+      setSuccess('');
+      try {
+          const data = await triggerSOS(sosBooking.id);
+          setSosAlertText(data.alertText);
+          setSuccess(data.message);
+      } catch (err) {
+          setError(err.response?.data?.message || 'Failed to dispatch SOS alert.');
+      } finally {
+          setSosLoading(false);
+          setSosConfirmOpen(false);
+      }
+  };
+
+  useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
     if (user) {
-        fetchDashboardData();
+      fetchDashboardData();
     }
-}, [user]);
+  }, [user]);
 
-const fetchDashboardData = async () => {
+  const fetchDashboardData = async () => {
     try {
-        const bookingsData = await getMyBookings();
-        setMyBookings(bookingsData.bookings);
-        setStats(prev => ({
-            ...prev,
-            ridesTaken: bookingsData.bookings.length,
-        }));
+      const bookingsData = await getMyBookings();
+      setMyBookings(bookingsData.bookings);
+      setStats(prev => ({
+        ...prev,
+        ridesTaken: bookingsData.bookings.length,
+      }));
     } catch (err) {
-        console.error('Failed to fetch bookings');
+      console.error('Failed to fetch bookings');
     }
 
     try {
-        const ridesData = await getMyRides();
-        setMyRides(ridesData.rides);
-        setStats(prev => ({
-            ...prev,
-            ridesOffered: ridesData.rides.length,
-        }));
+      const ridesData = await getMyRides();
+      setMyRides(ridesData.rides);
+      setStats(prev => ({
+        ...prev,
+        ridesOffered: ridesData.rides.length,
+      }));
     } catch (err) {
-        // User might not be a driver, that's okay
-        console.log('User is not a driver');
+      console.log('User is not a driver');
     }
-};
-
-  const handleLogout = async () => {
-    logout();
-    navigate('/');
-  };
-
-  const handleNavigate = (path) => {
-    setActivePath(path);
-    navigate(path);
-  };
-
-  // The premium map/grid glowing background style
-  const premiumBackgroundStyle = {
-    display: "flex", 
-    minHeight: "100vh", 
-    backgroundColor: theme.bgBase,
-    backgroundImage: `
-      radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.08), transparent 25%),
-      radial-gradient(circle at 85% 30%, rgba(167, 139, 250, 0.08), transparent 25%),
-      radial-gradient(circle at 50% 100%, rgba(52, 211, 153, 0.05), transparent 30%),
-      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
-    `,
-    backgroundSize: "100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px",
-    backgroundAttachment: "fixed",
-    fontFamily: "'DM Sans', sans-serif",
-    color: theme.textPrimary
   };
 
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <div style={premiumBackgroundStyle}>
+      <div style={{
+        opacity: loaded ? 1 : 0,
+        transform: loaded ? "translateY(0)" : "translateY(16px)",
+        transition: "all 0.5s cubic-bezier(0.16,1,0.3,1)",
+      }}>
+        
+        {/* Stats row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "28px" }}>
+          <StatCard icon={Luggage} label="Rides Taken" value={stats.ridesTaken} sub="Total bookings" color={theme.accentDark} bg={theme.accentLight} />
+          <StatCard icon={Car} label="Rides Offered" value={stats.ridesOffered} sub="Total rides posted" color={theme.success} bg={theme.successBg} />
+          <StatCard icon={Coins} label="Total Saved" value="₹2,450" sub="vs solo travel" color={theme.warningText} bg={theme.warningBg} />
+          <StatCard icon={Star} label="Avg Rating" value="4.8" sub="From 12 reviews" color="#7C3AED" bg="rgba(167, 139, 250, 0.08)" />
+        </div>
 
-        {/* Sidebar */}
-        <Sidebar activePath={activePath} onNavigate={handleNavigate} user={user} />
+        {/* Search */}
+        <SearchSection />
 
-        {/* Main content */}
-        <div style={{ marginLeft: "240px", flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-
-          {/* Top navbar */}
-          <TopNav user={user} notifications={notifications} onLogout={handleLogout} onNavigate={navigate} />
-
-          {/* Page content */}
-          <main style={{
-            padding: "28px 32px", flex: 1,
-            opacity: loaded ? 1 : 0,
-            transform: loaded ? "translateY(0)" : "translateY(16px)",
-            transition: "all 0.5s ease",
-            zIndex: 1,
-          }}>
-
-            {/* Stats row */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "28px" }}>
-              <StatCard icon="🧳" label="Rides Taken" value={stats.ridesTaken} sub="Total bookings" color={theme.accent} bg="rgba(56, 189, 248, 0.15)" />
-              <StatCard icon="🚗" label="Rides Offered" value={stats.ridesOffered} sub="Total rides posted" color={theme.successText} bg="rgba(52, 211, 153, 0.15)" />
-              <StatCard icon="💰" label="Total Saved" value="₹2,450" sub="vs solo travel" color={theme.warningText} bg="rgba(251, 191, 36, 0.15)" />
-              <StatCard icon="⭐" label="Avg Rating" value="4.8" sub="From 12 reviews" color="#A78BFA" bg="rgba(167, 139, 250, 0.15)" />
-            </div>
-
-            {/* Search */}
-            <SearchSection />
-
-            {/* Bottom grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "24px" }}>
-              <div>
-                <UpcomingRides bookings={myBookings} />
-                <RecentActivity bookings={myBookings} />
-                
-              </div>
-             <RightPanel user={user} navigate={navigate} />
-            </div>
-          </main>
+        {/* Bottom grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "24px" }}>
+          <div>
+            <UpcomingRides bookings={myBookings} onSOS={handleSOS} />
+            <RecentActivity bookings={myBookings} rides={myRides} />
+          </div>
+          <RightPanel user={user} navigate={navigate} />
         </div>
       </div>
 
-      <style>{`
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        * { box-sizing: border-box; }
-        
-        /* Custom Scrollbar for a premium feel */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
-      `}</style>
+      {/* SOS Confirmation Modal */}
+      {sosConfirmOpen && (
+          <div style={{
+              position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+              backdropFilter: 'blur(4px)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+              <div style={{
+                  backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                  borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '440px',
+                  boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+              }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '24px' }}>🚨</div>
+                      <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: 0 }}>
+                          Confirm SOS Emergency Alert
+                      </h3>
+                  </div>
+                  <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                      Are you sure you want to send an emergency alert to your trusted contacts? This will instantly compile and dispatch your current passenger, driver, vehicle, and trip route details via simulated SMS.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                          onClick={() => setSosConfirmOpen(false)}
+                          style={{
+                              flex: 1, padding: '12px', border: `1px solid ${theme.border}`,
+                              backgroundColor: 'white', color: theme.textSecondary,
+                              borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer'
+                          }}
+                      >
+                          Cancel
+                      </button>
+                      <button
+                          onClick={confirmSOS}
+                          disabled={sosLoading}
+                          style={{
+                              flex: 1, padding: '12px', border: 'none',
+                              backgroundColor: theme.danger, color: 'white',
+                              borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                          }}
+                      >
+                          {sosLoading ? 'Sending Alert...' : 'Send Alert'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* SOS Success & Alert Text Modal */}
+      {sosAlertText && (
+          <div style={{
+              position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+              backdropFilter: 'blur(4px)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+              <div style={{
+                  backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                  borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '500px',
+                  boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+              }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontSize: '24px' }}>✅</div>
+                      <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.success, margin: 0 }}>
+                          Emergency Alert Dispatched
+                      </h3>
+                  </div>
+                  {error && (
+                      <div style={{
+                          backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`,
+                          padding: "10px 14px", borderRadius: 8, fontSize: "12.5px", fontWeight: "600", marginBottom: 16
+                      }}>
+                          ⚠️ {error}
+                      </div>
+                  )}
+                  <p style={{ color: theme.textSecondary, fontSize: '14.5px', lineHeight: '1.6', marginBottom: '16px' }}>
+                      Your emergency contacts have been notified with the following trip safety information:
+                  </p>
+                  <div style={{
+                      backgroundColor: '#F9FAFB', border: `1px solid ${theme.border}`,
+                      borderRadius: '10px', padding: '16px', whiteSpace: 'pre-wrap',
+                      fontSize: '12.5px', fontFamily: 'monospace', color: theme.textPrimary,
+                      maxHeight: '220px', overflowY: 'auto', marginBottom: '24px'
+                  }}>
+                      {sosAlertText}
+                  </div>
+                  <button
+                      onClick={() => setSosAlertText('')}
+                      style={{
+                          width: '100%', padding: '12px', border: 'none',
+                          backgroundColor: theme.textPrimary, color: 'white',
+                          borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                      }}
+                  >
+                      Close Window
+                  </button>
+              </div>
+          </div>
+      )}
     </>
   );
 }

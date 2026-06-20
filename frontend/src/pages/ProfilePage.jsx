@@ -1,14 +1,52 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getMyProfile, updateMyProfile } from "../services/userService";
+import { getMyProfile, updateMyProfile, getEmergencyContacts, addEmergencyContact, updateEmergencyContact, deleteEmergencyContact } from "../services/userService";
+import axiosInstance from "../utils/axiosInstance";
+import {
+  Calendar,
+  Star,
+  Car,
+  Bike,
+  ShieldCheck,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Edit3,
+  User,
+  Settings,
+  Bell,
+  Mail,
+  Phone,
+  Plus,
+} from "lucide-react";
 
-const avatarColors = ["#f97316", "#3b82f6", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
+const avatarColors = ["#3B7597", "#093C5D", "#10B981", "#8B5CF6", "#EC4899", "#F59E0B"];
 function getColor(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
   return avatarColors[Math.abs(hash) % avatarColors.length];
 }
+
+const theme = {
+  bgCard: "#FFFFFF",
+  border: "#E2E8F0",
+  textPrimary: "#093C5D",
+  textSecondary: "#6B7280",
+  textMuted: "#94A3B8",
+  accent: "#3B7597",
+  accentDark: "#093C5D",
+  accentLight: "#EFF6FF",
+  success: "#10B981",
+  successBg: "#EFFDF4",
+  successText: "#10B981",
+  warning: "#F59E0B",
+  warningBg: "#FEF3C7",
+  warningText: "#D97706",
+  danger: "#EF4444",
+  dangerBg: "#FEE2E2",
+};
 
 function Avatar({ name, size = 48, src }) {
   const initials = name?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -24,13 +62,11 @@ function Avatar({ name, size = 48, src }) {
   );
 }
 
-function StarRating({ rating, size = 14 }) {
+function StarRating({ rating, size = 16 }) {
   return (
-    <span style={{ display: "inline-flex", gap: 1 }}>
+    <span style={{ display: "inline-flex", gap: 2 }}>
       {[1, 2, 3, 4, 5].map((s) => (
-        <svg key={s} width={size} height={size} viewBox="0 0 20 20" fill={s <= Math.round(rating) ? "#f59e0b" : "#374151"}>
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
+        <Star key={s} size={size} fill={s <= Math.round(rating) ? "#F59E0B" : "transparent"} color={s <= Math.round(rating) ? "#F59E0B" : theme.textMuted} />
       ))}
     </span>
   );
@@ -48,53 +84,53 @@ function EditModal({ user, onClose, onSave }) {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+      position: "fixed", inset: 0, background: "rgba(9, 60, 93, 0.4)", zIndex: 1000,
       display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
     }}>
       <div style={{
-        background: "#1a1f2e", border: "1px solid #2d3748", borderRadius: 16, padding: 32,
-        width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(0,0,0,0.5)"
+        background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 32,
+        width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h3 style={{ color: "#f1f5f9", fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>Edit Profile</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 20 }}>✕</button>
+          <h3 style={{ color: theme.textPrimary, fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Sora', sans-serif" }}>Edit Profile</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 20 }}>✕</button>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 6, textTransform: "capitalize", fontFamily: "'DM Sans', sans-serif" }}>Full Name</label>
+          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Full Name</label>
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             style={{
-              width: "100%", background: "#0f1420", border: "1px solid #2d3748", borderRadius: 8,
-              color: "#f1f5f9", padding: "10px 14px", fontSize: 14, outline: "none",
+              width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+              color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
               fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box",
             }}
           />
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>Email Address</label>
+          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Email Address</label>
           <input
             value={user.email}
             disabled
             style={{
-              width: "100%", background: "#0a0f1a", border: "1px solid #1e2535", borderRadius: 8,
-              color: "#64748b", padding: "10px 14px", fontSize: 14, outline: "none",
+              width: "100%", background: "#F3F4F6", border: `1px solid ${theme.border}`, borderRadius: 8,
+              color: theme.textMuted, padding: "10px 14px", fontSize: 14, outline: "none",
               fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box", cursor: "not-allowed",
             }}
           />
-          <span style={{ fontSize: 11, color: "#64748b", marginTop: 4, display: "block" }}>Email cannot be changed</span>
+          <span style={{ fontSize: 11, color: theme.textMuted, marginTop: 4, display: "block" }}>Email cannot be changed</span>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 6, fontFamily: "'DM Sans', sans-serif" }}>Phone Number</label>
+          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Phone Number</label>
           <input
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             style={{
-              width: "100%", background: "#0f1420", border: "1px solid #2d3748", borderRadius: 8,
-              color: "#f1f5f9", padding: "10px 14px", fontSize: 14, outline: "none",
+              width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+              color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
               fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box",
             }}
           />
@@ -102,12 +138,12 @@ function EditModal({ user, onClose, onSave }) {
 
         <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
           <button onClick={onClose} style={{
-            flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #2d3748",
-            background: "none", color: "#94a3b8", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14
+            flex: 1, padding: "12px 0", borderRadius: 8, border: `1px solid ${theme.border}`,
+            background: "none", color: theme.textSecondary, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: "600"
           }}>Cancel</button>
           <button onClick={handleSave} disabled={loading} style={{
-            flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
-            background: loading ? "#1e3a5f" : "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff",
+            flex: 1, padding: "12px 0", borderRadius: 8, border: "none",
+            background: loading ? theme.accent : theme.textPrimary, color: "#fff",
             cursor: loading ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600
           }}>{loading ? "Saving..." : "Save Changes"}</button>
         </div>
@@ -117,17 +153,61 @@ function EditModal({ user, onClose, onSave }) {
 }
 
 export default function ProfilePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { updateUser } = useAuth();
+  
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    return ["overview", "reviews", "emergency-contacts", "settings"].includes(tab) ? tab : "overview";
+  };
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [editOpen, setEditOpen] = useState(false);
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+
+  // Emergency Contacts state variables
+  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const [fetchingContacts, setFetchingContacts] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
+  const [contactForm, setContactForm] = useState({ name: "", relationship: "Parent", phone: "" });
+  const [formError, setFormError] = useState("");
+  const [formSaving, setFormSaving] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && ["overview", "reviews", "emergency-contacts", "settings"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  // Fetch emergency contacts when switching to the tab
+  useEffect(() => {
+    if (activeTab === "emergency-contacts") {
+      const fetchContacts = async () => {
+        setFetchingContacts(true);
+        try {
+          const res = await getEmergencyContacts();
+          setEmergencyContacts(res.contacts || []);
+        } catch (err) {
+          console.error("Failed to fetch emergency contacts:", err);
+        } finally {
+          setFetchingContacts(false);
+        }
+      };
+      fetchContacts();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const data = await getMyProfile();
+        const vehicleRes = await axiosInstance.get("/vehicles");
         setUser({
           name: data.user.name,
           email: data.user.email,
@@ -140,6 +220,7 @@ export default function ProfilePage() {
           created_at: data.user.created_at,
           profile_pic: data.user.profile_pic || null,
           verification_status: data.verification_status,
+          vehicles: vehicleRes.data.vehicles || [],
           reviews: [],
         });
       } catch (err) {
@@ -156,11 +237,54 @@ export default function ProfilePage() {
     try {
       const data = await updateMyProfile(updated.name, updated.phone, user.profile_pic);
       setUser({ ...user, name: data.user.name, phone: data.user.phone });
+      updateUser({ name: data.user.name, phone: data.user.phone });
     } catch (err) {
       console.error("Failed to update profile:", err);
       setUser({ ...user, ...updated });
     } finally {
       setEditOpen(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!contactForm.name.trim()) {
+      setFormError("Full Name is required.");
+      return;
+    }
+    if (!contactForm.phone.trim()) {
+      setFormError("Phone Number is required.");
+      return;
+    }
+    if (!/^\+?[1-9]\d{7,14}$/.test(contactForm.phone.trim())) {
+      setFormError("Invalid phone number format. Must be 8 to 15 digits (e.g. +919876543210).");
+      return;
+    }
+
+    setFormSaving(true);
+    setFormError("");
+    try {
+      if (editingContact) {
+        const res = await updateEmergencyContact(editingContact.id, contactForm);
+        setEmergencyContacts(emergencyContacts.map((c) => (c.id === editingContact.id ? res.contact : c)));
+      } else {
+        const res = await addEmergencyContact(contactForm);
+        setEmergencyContacts([...emergencyContacts, res.contact]);
+      }
+      setFormOpen(false);
+    } catch (err) {
+      setFormError(err.response?.data?.message || "Failed to save contact.");
+    } finally {
+      setFormSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this emergency contact?")) return;
+    try {
+      await deleteEmergencyContact(id);
+      setEmergencyContacts(emergencyContacts.filter((c) => c.id !== id));
+    } catch (err) {
+      alert("Failed to delete contact.");
     }
   };
 
@@ -172,14 +296,15 @@ export default function ProfilePage() {
     ? [
         { id: "overview", label: "Overview" },
         { id: "reviews", label: `Reviews (${user.reviews.length})` },
+        { id: "emergency-contacts", label: "Emergency Contacts" },
         { id: "settings", label: "Settings" },
       ]
     : [];
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f1420", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "#3b82f6", fontFamily: "'DM Sans', sans-serif", fontSize: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 0" }}>
+        <div style={{ color: theme.accent, fontFamily: "'DM Sans', sans-serif", fontSize: "18px" }}>
           Loading profile...
         </div>
       </div>
@@ -188,369 +313,604 @@ export default function ProfilePage() {
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0f1420; }
-        .profile-page { min-height: 100vh; background: #0f1420; font-family: 'DM Sans', sans-serif; display: flex; }
-        .sidebar { width: 240px; background: #131825; border-right: 1px solid #1e2535; padding: 24px 0; display: flex; flex-direction: column; flex-shrink: 0; }
-        .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 20px 28px; border-bottom: 1px solid #1e2535; cursor: pointer; }
-        .logo-box { width: 36px; height: 36px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: 16px; }
-        .logo-text { font-size: 18px; font-weight: 700; color: #f1f5f9; }
-        .nav-items { padding: 16px 12px; flex: 1; }
-        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: #64748b; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; margin-bottom: 2px; }
-        .nav-item:hover { background: #1e2535; color: #94a3b8; }
-        .nav-item.active { background: #1e3a5f; color: #3b82f6; }
-        .main { flex: 1; overflow-y: auto; }
-        .topbar { background: #131825; border-bottom: 1px solid #1e2535; padding: 0 32px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
-        .topbar-title { color: #f1f5f9; font-size: 18px; font-weight: 700; }
-        .topbar-right { display: flex; align-items: center; gap: 12px; }
-        .content { padding: 32px; max-width: 900px; }
-        .profile-hero { background: linear-gradient(135deg, #1a2235 0%, #131825 100%); border: 1px solid #1e2535; border-radius: 16px; padding: 32px; margin-bottom: 24px; position: relative; overflow: hidden; }
-        .profile-hero::before { content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%); border-radius: 50%; }
-        .profile-hero-inner { display: flex; align-items: flex-start; gap: 24px; position: relative; }
-        .avatar-wrapper { position: relative; }
-        .avatar-edit-btn { position: absolute; bottom: 0; right: 0; width: 26px; height: 26px; background: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #131825; }
-        .profile-info { flex: 1; }
-        .profile-name { font-size: 24px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
-        .profile-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-        .meta-badge { display: flex; align-items: center; gap: 5px; background: #1e2535; border-radius: 20px; padding: 4px 10px; font-size: 12px; color: #94a3b8; }
-        .verified-badge { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); color: #10b981; }
-        .rating-display { display: flex; align-items: center; gap: 6px; }
-        .rating-num { font-size: 15px; font-weight: 700; color: #f59e0b; }
-        .profile-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-        .btn-primary { padding: 9px 20px; background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
-        .btn-primary:hover { opacity: 0.9; }
-        .btn-secondary { padding: 9px 20px; background: none; color: #94a3b8; border: 1px solid #2d3748; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-        .btn-secondary:hover { border-color: #3b82f6; color: #3b82f6; }
-        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: #131825; border: 1px solid #1e2535; border-radius: 12px; padding: 20px; text-align: center; }
-        .stat-num { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; font-family: 'DM Mono', monospace; }
-        .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
-        .stat-sub { font-size: 11px; color: #3b82f6; margin-top: 3px; }
-        .tabs { display: flex; gap: 4px; background: #131825; border: 1px solid #1e2535; border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
-        .tab { padding: 8px 18px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; color: #64748b; transition: all 0.15s; }
-        .tab.active { background: #1e3a5f; color: #3b82f6; }
-        .tab:hover:not(.active) { color: #94a3b8; }
-        .section-card { background: #131825; border: 1px solid #1e2535; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-        .section-title { font-size: 14px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .info-item label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 5px; }
-        .info-item span { font-size: 14px; color: #e2e8f0; font-weight: 500; }
-        .review-item { padding: 16px 0; border-bottom: 1px solid #1e2535; }
-        .review-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .review-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .reviewer-info { flex: 1; }
-        .reviewer-name { font-size: 14px; font-weight: 600; color: #e2e8f0; }
-        .review-date { font-size: 11px; color: #64748b; margin-top: 2px; }
-        .review-comment { font-size: 13px; color: #94a3b8; line-height: 1.5; }
-        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #1e2535; }
-        .setting-row:last-child { border-bottom: none; }
-        .setting-label { font-size: 14px; color: #e2e8f0; font-weight: 500; }
-        .setting-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
-        .toggle { width: 40px; height: 22px; background: #3b82f6; border-radius: 11px; position: relative; cursor: pointer; transition: background 0.2s; }
-        .toggle.off { background: #2d3748; }
-        .toggle-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 3px; right: 3px; transition: right 0.2s; }
-        .toggle.off .toggle-thumb { right: auto; left: 3px; }
-        .danger-zone { background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.15); border-radius: 12px; padding: 20px; margin-top: 8px; }
-        .danger-title { font-size: 13px; font-weight: 600; color: #ef4444; margin-bottom: 12px; }
-        .btn-danger { padding: 8px 16px; background: none; color: #ef4444; border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
-        .btn-danger:hover { background: rgba(239,68,68,0.1); }
-      `}</style>
+      <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      <div className="profile-page">
-        {/* Sidebar */}
-        <aside className="sidebar">
-          <div className="sidebar-logo" onClick={() => navigate("/dashboard")}>
-            <div className="logo-box">R</div>
-            <span className="logo-text">Ridivo</span>
-          </div>
-          <nav className="nav-items">
-            {[
-              { label: "Dashboard", icon: "⊞", path: "/dashboard" },
-              { label: "Find a Ride", icon: "🔍", path: "/find-ride" },
-              { label: "My Rides", icon: "🚗", path: "/my-rides" },
-              { label: "Offer a Ride", icon: "➕", path: "/offer-ride" },
-              { label: "Bookings", icon: "📋", path: "/bookings" },
-              { label: "Payments", icon: "💰", path: "/payments" },
-              { label: "Reviews", icon: "⭐", path: "/reviews" },
-              { label: "Profile", icon: "👤", path: "/profile", active: true },
-              { label: "Settings", icon: "⚙️", path: "/settings" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className={`nav-item ${item.active ? "active" : ""}`}
-                onClick={() => item.path && navigate(item.path)}
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+        {/* Profile Hero Card */}
+        <div style={{
+          background: `linear-gradient(135deg, ${theme.accentLight} 0%, #E0F2FE 100%)`,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "20px", padding: "32px", marginBottom: "28px",
+          position: "relative", overflow: "hidden",
+          boxShadow: "0 10px 30px rgba(9, 60, 93, 0.02)"
+        }}>
+          <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px", background: "radial-gradient(circle, rgba(9,60,93,0.06), transparent)", borderRadius: "50%" }} />
+          
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", position: "relative" }}>
+            <div style={{ position: "relative" }}>
+              <Avatar name={user.name} size={84} src={user.profile_pic} />
+              <button 
+                onClick={() => navigate('/edit-profile')}
+                style={{
+                  position: "absolute", bottom: 0, right: 0, width: "28px", height: "28px",
+                  backgroundColor: theme.textPrimary, borderRadius: "50%", display: "flex",
+                  alignItems: "center", justifyContent: "center", cursor: "pointer", border: `2px solid ${theme.bgCard}`,
+                  color: "white"
+                }}
               >
-                <span style={{ fontSize: 15 }}>{item.icon}</span>
-                {item.label}
-              </div>
-            ))}
-          </nav>
-          <div style={{ padding: "16px 20px", margin: "0 12px 12px", background: "rgba(59,130,246,0.07)", borderRadius: 10, border: "1px solid rgba(59,130,246,0.15)" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6", marginBottom: 4 }}>Got Empty Seats?</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>Share your ride and split the cost</div>
-            <button className="btn-primary" style={{ width: "100%", fontSize: 12, padding: "7px 0" }}
-              onClick={() => navigate("/offer-ride")}>
-              Offer a Ride
-            </button>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <div className="main">
-          <div className="topbar">
-            <span className="topbar-title">My Profile</span>
-            <div className="topbar-right">
-              <button
-                onClick={() => { logout(); navigate("/"); }}
-                style={{ background: "none", border: "1px solid #2d3748", color: "#94a3b8", borderRadius: "8px", padding: "6px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", transition: "all 0.2s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "#ef4444"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2d3748"; e.currentTarget.style.color = "#94a3b8"; }}
-              >
-                Sign Out
+                <Edit3 size={12} />
               </button>
-              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1e2535", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <span style={{ fontSize: 14 }}>🔔</span>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "24px", fontWeight: "800", color: theme.textPrimary, fontFamily: "'Sora', sans-serif", marginBottom: "6px" }}>{user.name}</div>
+              
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "5px",
+                  backgroundColor: user.is_email_verified ? theme.successBg : theme.dangerBg,
+                  borderRadius: "20px", padding: "4px 12px", fontSize: "11px", fontWeight: "700",
+                  color: user.is_email_verified ? theme.success : theme.danger,
+                  border: `1px solid ${user.is_email_verified ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
+                }}>
+                  {user.is_email_verified ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                  {user.is_email_verified ? "Verified User" : "Unverified"}
+                </div>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#fff", border: `1px solid ${theme.border}`, borderRadius: "20px", padding: "4px 12px", fontSize: "11px", color: theme.textSecondary, fontWeight: "600" }}>
+                  <Calendar size={12} /> Member since {memberSince}
+                </div>
               </div>
-              <Avatar name={user.name} size={34} src={user.profile_pic} />
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <StarRating rating={user.avg_rating} size={14} />
+                <span style={{ fontSize: "14px", fontWeight: "700", color: "#F59E0B" }}>{user.avg_rating}</span>
+                <span style={{ fontSize: "12px", color: theme.textSecondary }}>({user.reviews.length} reviews)</span>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                <button 
+                  onClick={() => navigate('/edit-profile')}
+                  style={{
+                    padding: "10px 20px", backgroundColor: theme.textPrimary, color: "white",
+                    border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
+                    display: "flex", alignItems: "center", gap: "6px"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#07304b"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.textPrimary}
+                >
+                  <Edit3 size={14} /> Edit Profile
+                </button>
+
+                {user.verification_status === null && (
+                  <button 
+                    onClick={() => navigate("/verify")}
+                    style={{
+                      padding: "10px 20px", backgroundColor: "white", color: theme.textPrimary,
+                      border: `1px solid ${theme.border}`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+                      cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s"
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.textPrimary; e.currentTarget.style.backgroundColor = theme.accentLight; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; }}
+                  >
+                    🛡️ Become a Driver
+                  </button>
+                )}
+                {user.verification_status?.status === "PENDING" && (
+                  <div style={{
+                    padding: "10px 20px", backgroundColor: theme.warningBg, color: theme.warningText,
+                    border: `1px solid rgba(245, 158, 11, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+                    display: "flex", alignItems: "center", gap: "6px"
+                  }}>
+                    <Clock size={14} /> Verification Pending
+                  </div>
+                )}
+                {user.verification_status?.status === "APPROVED" && (
+                  <div style={{
+                    padding: "10px 20px", backgroundColor: theme.successBg, color: theme.success,
+                    border: `1px solid rgba(16, 185, 129, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+                    display: "flex", alignItems: "center", gap: "6px"
+                  }}>
+                    <ShieldCheck size={14} /> Verified Driver
+                  </div>
+                )}
+                {user.verification_status?.status === "REJECTED" && (
+                  <button 
+                    onClick={() => navigate("/verify")}
+                    style={{
+                      padding: "10px 20px", backgroundColor: theme.dangerBg, color: theme.danger,
+                      border: `1px solid rgba(239, 68, 68, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
+                    }}
+                  >
+                    <AlertTriangle size={14} /> Reapply Verification
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="content">
-            {/* Hero */}
-            <div className="profile-hero">
-              <div className="profile-hero-inner">
-                <div className="avatar-wrapper">
-                  <Avatar name={user.name} size={80} src={user.profile_pic} />
-                  <div className="avatar-edit-btn">
-                    <svg width="12" height="12" fill="white" viewBox="0 0 20 20">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="profile-info">
-                  <div className="profile-name">{user.name}</div>
-                  <div className="profile-meta">
-                    <div className={`meta-badge ${user.is_email_verified ? "verified-badge" : ""}`}>
-                      {user.is_email_verified ? "✓ Verified" : "✗ Unverified"}
-                    </div>
-                    <div className="meta-badge">
-                      <span>📅</span> Member since {memberSince}
-                    </div>
-                  </div>
-                  <div className="rating-display">
-                    <StarRating rating={user.avg_rating} size={16} />
-                    <span className="rating-num">{user.avg_rating}</span>
-                    <span style={{ fontSize: 12, color: "#64748b" }}>({user.reviews.length} reviews)</span>
-                  </div>
-                  <div className="profile-actions">
-                    <button className="btn-primary" onClick={() => setEditOpen(true)}>✏️ Edit Profile</button>
+        {/* Stats Row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "28px" }}>
+          {[
+            { num: user.total_rides, label: "Rides Taken", sub: "↑ 3 this month" },
+            { num: user.rides_offered, label: "Rides Offered", sub: "↑ 1 this month" },
+            { num: `₹${user.total_saved}`, label: "Total Saved", sub: "vs solo travel" },
+          ].map((stat, i) => (
+            <div key={i} style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
+              <div style={{ fontSize: "28px", fontWeight: "800", color: theme.textPrimary, marginBottom: "4px", fontFamily: "'Sora', sans-serif" }}>{stat.num}</div>
+              <div style={{ fontSize: "13px", color: theme.textSecondary, fontWeight: "600" }}>{stat.label}</div>
+              <div style={{ fontSize: "11px", color: theme.accent, marginTop: "4px", fontWeight: "500" }}>{stat.sub}</div>
+            </div>
+          ))}
+        </div>
 
-                    {/* Dynamic verification button */}
-                    {user.verification_status === null && (
-                      <button className="btn-secondary" onClick={() => navigate("/verify")}>
-                        🛡️ Become a Driver
-                      </button>
-                    )}
-                    {user.verification_status?.status === "PENDING" && (
-                      <button className="btn-secondary" style={{ color: "#FBBF24", borderColor: "#FBBF24", cursor: "default" }}>
-                        ⏳ Verification Pending
-                      </button>
-                    )}
-                    {user.verification_status?.status === "APPROVED" && (
-                      <button className="btn-secondary" style={{ color: "#10B981", borderColor: "#10B981", cursor: "default" }}>
-                        ✅ Verified Driver
-                      </button>
-                    )}
-                    {user.verification_status?.status === "REJECTED" && (
-                      <button className="btn-secondary" style={{ color: "#EF4444", borderColor: "#EF4444" }} onClick={() => navigate("/verify")}>
-                        ❌ Rejected — Reapply
-                      </button>
-                    )}
-                  </div>
-                </div>
+        {/* Navigation Tabs */}
+        <div style={{ display: "flex", gap: "4px", backgroundColor: "rgba(9,60,93,0.03)", padding: "4px", borderRadius: "12px", border: `1px solid ${theme.border}`, marginBottom: "28px", width: "fit-content" }}>
+          {tabs.map((t) => (
+            <div 
+              key={t.id} 
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                padding: "8px 20px", borderRadius: "8px", fontSize: "13.5px", fontWeight: "600", cursor: "pointer",
+                backgroundColor: activeTab === t.id ? theme.bgCard : "transparent",
+                color: activeTab === t.id ? theme.textPrimary : theme.textSecondary,
+                transition: "all 0.2s",
+                boxShadow: activeTab === t.id ? "0 4px 10px rgba(9, 60, 93, 0.03)" : "none"
+              }}
+            >
+              {t.label}
+            </div>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        {activeTab === "overview" && (
+          <>
+            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Personal Information</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                {[
+                  { label: "Full Name", value: user.name, icon: User },
+                  { label: "Email Address", value: user.email, icon: Mail },
+                  { label: "Phone Number", value: user.phone, icon: Phone },
+                  { label: "Member Since", value: memberSince, icon: Calendar },
+                ].map((item, i) => {
+                  const IconComp = item.icon;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${theme.border}`, borderRadius: "10px", backgroundColor: "#F9FAFB" }}>
+                      <IconComp size={18} style={{ color: theme.textSecondary }} />
+                      <div>
+                        <div style={{ fontSize: "11px", color: theme.textSecondary, fontWeight: "600", textTransform: "uppercase" }}>{item.label}</div>
+                        <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "700", marginTop: "2px" }}>{item.value}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="stats-row">
-              <div className="stat-card">
-                <div className="stat-num">{user.total_rides}</div>
-                <div className="stat-label">Rides Taken</div>
-                <div className="stat-sub">↑ 3 this month</div>
+            {/* Verification Status Card */}
+            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Driver Verification</div>
+              {user.verification_status === null && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ color: theme.textPrimary, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Not Applied</div>
+                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>Apply to become a verified driver and start offering rides</div>
+                  </div>
+                  <button onClick={() => navigate("/verify")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Apply Now</button>
+                </div>
+              )}
+              {user.verification_status?.status === "PENDING" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.warningBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.warningText }}><Clock size={20} /></div>
+                  <div>
+                    <div style={{ color: theme.warningText, fontSize: 14, fontWeight: 700 }}>Verification Pending</div>
+                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>Admin is reviewing your documents</div>
+                  </div>
+                </div>
+              )}
+              {user.verification_status?.status === "APPROVED" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.successBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.success }}><ShieldCheck size={20} /></div>
+                  <div>
+                    <div style={{ color: theme.success, fontSize: 14, fontWeight: 700 }}>Verified Driver</div>
+                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>You can now offer rides on Ridivo</div>
+                  </div>
+                </div>
+              )}
+              {user.verification_status?.status === "REJECTED" && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.dangerBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.danger }}><AlertTriangle size={20} /></div>
+                    <div>
+                      <div style={{ color: theme.danger, fontSize: 14, fontWeight: 700 }}>Verification Rejected</div>
+                      <div style={{ color: theme.textSecondary, fontSize: 12 }}>{user.verification_status.rejection_reason || "Please reapply with correct documents"}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => navigate("/verify")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reapply</button>
+                </div>
+              )}
+            </div>
+            
+            {/* Vehicles section */}
+            {user.verification_status?.status === "APPROVED" && (
+              <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                  <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px" }}>My Vehicles</div>
+                  <button onClick={() => navigate("/edit-profile?tab=vehicles")} style={{ padding: "8px 14px", backgroundColor: theme.accentLight, color: theme.textPrimary, border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Plus size={14} /> Add Vehicle
+                  </button>
+                </div>
+
+                {user.vehicles && user.vehicles.length > 0 ? (
+                  user.vehicles.map((v) => (
+                    <div key={v.id} style={{
+                      display: "flex", alignItems: "center", gap: "14px",
+                      padding: "14px 18px", borderRadius: "12px", marginBottom: "10px",
+                      backgroundColor: "#F9FAFB",
+                      border: `1px solid ${v.is_active ? "rgba(9, 60, 93, 0.2)" : theme.border}`,
+                    }}>
+                      <div style={{ width: "44px", height: "44px", borderRadius: "10px", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary }}>
+                        {v.vehicle_type === "BIKE" ? <Bike size={22} /> : <Car size={22} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: theme.textPrimary, fontSize: "14px", fontWeight: "700", marginBottom: "3px" }}>
+                          {v.vehicle_name}
+                          {v.is_active && (
+                            <span style={{ marginLeft: "8px", fontSize: "10px", backgroundColor: "rgba(16, 185, 129, 0.1)", color: theme.success, padding: "2px 8px", borderRadius: "100px", fontWeight: "700" }}>
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ color: theme.textSecondary, fontSize: "12px" }}>
+                          {v.vehicle_number} · {v.vehicle_type} · {v.total_seats} seats {v.color ? `· ${v.color}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: "center", padding: "32px 0", color: theme.textSecondary }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '8px' }}>
+                      <Car size={36} />
+                    </div>
+                    <div style={{ fontSize: "13px", marginBottom: "12px" }}>No vehicles added yet</div>
+                    <button onClick={() => navigate("/edit-profile?tab=vehicles")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                      Add Your First Vehicle
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="stat-card">
-                <div className="stat-num">{user.rides_offered}</div>
-                <div className="stat-label">Rides Offered</div>
-                <div className="stat-sub">↑ 1 this month</div>
+            )}
+          </>
+        )}
+
+        {/* Tab: Emergency Contacts */}
+        {activeTab === "emergency-contacts" && (
+          <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px" }}>Emergency Contacts</div>
+                <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px" }}>Manage up to 5 trusted contacts for instant SOS ride safety alerts.</div>
               </div>
-              <div className="stat-card">
-                <div className="stat-num">₹{user.total_saved.toLocaleString("en-IN")}</div>
-                <div className="stat-label">Total Saved</div>
-                <div className="stat-sub">vs solo travel</div>
-              </div>
+              {emergencyContacts.length < 5 && (
+                <button
+                  onClick={() => {
+                    setEditingContact(null);
+                    setContactForm({ name: "", relationship: "Parent", phone: "" });
+                    setFormError("");
+                    setFormOpen(true);
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    backgroundColor: theme.textPrimary,
+                    color: "white",
+                    border: "none",
+                    borderRadius: "10px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#07304b"}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.textPrimary}
+                >
+                  <Plus size={14} /> Add Contact
+                </button>
+              )}
             </div>
 
-            {/* Tabs */}
-            <div className="tabs">
-              {tabs.map((t) => (
-                <div key={t.id} className={`tab ${activeTab === t.id ? "active" : ""}`} onClick={() => setActiveTab(t.id)}>
-                  {t.label}
+            {fetchingContacts ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
+                Loading contacts...
+              </div>
+            ) : emergencyContacts.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "48px 20px", color: theme.textSecondary, border: `1px dashed ${theme.border}`, borderRadius: "12px", backgroundColor: "#F9FAFB" }}>
+                <div style={{ fontSize: "32px", marginBottom: "12px" }}>🛡️</div>
+                <div style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px", fontFamily: "'Sora', sans-serif" }}>No Emergency Contacts Saved</div>
+                <div style={{ fontSize: "12.5px", maxWidth: "340px", margin: "0 auto 16px", lineHeight: "1.5" }}>Add trusted friends, family, or relatives so we can alert them instantly in case of an emergency.</div>
+                <button
+                  onClick={() => {
+                    setEditingContact(null);
+                    setContactForm({ name: "", relationship: "Parent", phone: "" });
+                    setFormError("");
+                    setFormOpen(true);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: theme.textPrimary,
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "12.5px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif"
+                  }}
+                >
+                  Add First Contact
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
+                {emergencyContacts.map((contact) => (
+                  <div key={contact.id} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "16px 20px",
+                    backgroundColor: "#F9FAFB",
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "12px",
+                    transition: "all 0.2s"
+                  }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.boxShadow = "0 4px 12px rgba(9, 60, 93, 0.02)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.boxShadow = "none"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{
+                        width: "42px", height: "42px", borderRadius: "50%",
+                        backgroundColor: theme.accentLight, display: "flex",
+                        alignItems: "center", justifyContent: "center", color: theme.textPrimary,
+                        fontSize: "16px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif"
+                      }}>
+                        {contact.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif" }}>{contact.name}</span>
+                          <span style={{
+                            fontSize: "10.5px",
+                            fontWeight: "700",
+                            backgroundColor: "rgba(9, 60, 93, 0.06)",
+                            color: theme.textPrimary,
+                            padding: "2px 8px",
+                            borderRadius: "100px",
+                            textTransform: "uppercase"
+                          }}>{contact.relationship}</span>
+                        </div>
+                        <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Phone size={11} /> {contact.phone}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => {
+                          setEditingContact(contact);
+                          setContactForm({ name: contact.name, relationship: contact.relationship, phone: contact.phone });
+                          setFormError("");
+                          setFormOpen(true);
+                        }}
+                        style={{
+                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
+                          backgroundColor: "white", color: theme.textSecondary, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.color = theme.textPrimary; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; }}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContact(contact.id)}
+                        style={{
+                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
+                          backgroundColor: "white", color: theme.danger, cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Reviews */}
+        {activeTab === "reviews" && (
+          <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Reviews From Co-Passengers</div>
+            {user.reviews.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: theme.textSecondary }}>
+                <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '12px' }}>
+                  <Star size={40} />
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>No reviews yet</div>
+                <div style={{ fontSize: 12 }}>Complete rides to receive reviews from co-passengers</div>
+              </div>
+            ) : (
+              user.reviews.map((r) => (
+                <div key={r.id} style={{ padding: "16px 0", borderBottom: `1px solid ${theme.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                    <Avatar name={r.reviewer} size={38} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{r.reviewer}</div>
+                      <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+                    </div>
+                    <StarRating rating={r.rating} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: theme.textSecondary, lineLineHeight: "1.5" }}>"{r.comment}"</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Tab: Settings */}
+        {activeTab === "settings" && (
+          <>
+            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Notifications</div>
+              {[
+                { label: "Ride Alerts", desc: "Get notified when a ride matches your route", on: true },
+                { label: "Booking Updates", desc: "Confirmations and cancellation alerts", on: true },
+                { label: "Promotions", desc: "Deals and offers from Ridivo", on: false },
+                { label: "Review Reminders", desc: "Reminders to review past rides", on: true },
+              ].map((s, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i < 3 ? `1px solid ${theme.border}` : "none" }}>
+                  <div>
+                    <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "600" }}>{s.label}</div>
+                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{s.desc}</div>
+                  </div>
+                  <div style={{ width: "40px", height: "22px", backgroundColor: s.on ? theme.success : theme.border, borderRadius: "11px", position: "relative", cursor: "pointer", transition: "all 0.2s" }}>
+                    <div style={{ width: "16px", height: "16px", backgroundColor: "#fff", borderRadius: "50%", position: "absolute", top: "3px", right: s.on ? "3px" : "auto", left: s.on ? "auto" : "3px", transition: "all 0.2s" }} />
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Tab: Overview */}
-            {activeTab === "overview" && (
-              <>
-                <div className="section-card">
-                  <div className="section-title">Personal Information</div>
-                  <div className="info-grid">
-                    <div className="info-item"><label>Full Name</label><span>{user.name}</span></div>
-                    <div className="info-item"><label>Email Address</label><span>{user.email}</span></div>
-                    <div className="info-item"><label>Phone Number</label><span>{user.phone}</span></div>
-                    <div className="info-item"><label>Member Since</label><span>{memberSince}</span></div>
+            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Privacy</div>
+              {[
+                { label: "Show Phone Number", desc: "Visible to co-passengers after booking", on: false },
+                { label: "Public Profile", desc: "Anyone can view your profile and reviews", on: true },
+              ].map((s, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i < 1 ? `1px solid ${theme.border}` : "none" }}>
+                  <div>
+                    <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "600" }}>{s.label}</div>
+                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{s.desc}</div>
+                  </div>
+                  <div style={{ width: "40px", height: "22px", backgroundColor: s.on ? theme.success : theme.border, borderRadius: "11px", position: "relative", cursor: "pointer", transition: "all 0.2s" }}>
+                    <div style={{ width: "16px", height: "16px", backgroundColor: "#fff", borderRadius: "50%", position: "absolute", top: "3px", right: s.on ? "3px" : "auto", left: s.on ? "auto" : "3px", transition: "all 0.2s" }} />
                   </div>
                 </div>
-                <div className="section-card">
-                  <div className="section-title">Ride Statistics</div>
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <label>Average Rating</label>
-                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <StarRating rating={user.avg_rating} /> {user.avg_rating}
-                      </span>
-                    </div>
-                    <div className="info-item"><label>Total Rides Taken</label><span>{user.total_rides} rides</span></div>
-                    <div className="info-item"><label>Rides Offered</label><span>{user.rides_offered} rides</span></div>
-                    <div className="info-item"><label>Total Saved</label><span style={{ color: "#10b981" }}>₹{user.total_saved.toLocaleString("en-IN")}</span></div>
-                  </div>
-                </div>
+              ))}
+            </div>
 
-                {/* Verification Status Card */}
-                <div className="section-card">
-                  <div className="section-title">Driver Verification</div>
-                  {user.verification_status === null && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div>
-                        <div style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Not Applied</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>Apply to become a verified driver and start offering rides</div>
-                      </div>
-                      <button className="btn-primary" onClick={() => navigate("/verify")}>Apply Now</button>
-                    </div>
-                  )}
-                  {user.verification_status?.status === "PENDING" && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⏳</div>
-                      <div>
-                        <div style={{ color: "#FBBF24", fontSize: 14, fontWeight: 600 }}>Verification Pending</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>Admin is reviewing your documents</div>
-                      </div>
-                    </div>
-                  )}
-                  {user.verification_status?.status === "APPROVED" && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>✅</div>
-                      <div>
-                        <div style={{ color: "#10B981", fontSize: 14, fontWeight: 600 }}>Verified Driver</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>You can now offer rides on Ridivo</div>
-                      </div>
-                    </div>
-                  )}
-                  {user.verification_status?.status === "REJECTED" && (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(239,68,68,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>❌</div>
-                        <div>
-                          <div style={{ color: "#EF4444", fontSize: 14, fontWeight: 600 }}>Verification Rejected</div>
-                          <div style={{ color: "#64748b", fontSize: 12 }}>{user.verification_status.rejection_reason || "Please reapply with correct documents"}</div>
-                        </div>
-                      </div>
-                      <button className="btn-primary" onClick={() => navigate("/verify")}>Reapply</button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Tab: Reviews */}
-            {activeTab === "reviews" && (
-              <div className="section-card">
-                <div className="section-title">Reviews From Co-Passengers</div>
-                {user.reviews.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px 0", color: "#64748b" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>⭐</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#94a3b8", marginBottom: 4 }}>No reviews yet</div>
-                    <div style={{ fontSize: 12 }}>Complete rides to receive reviews from co-passengers</div>
-                  </div>
-                ) : (
-                  user.reviews.map((r) => (
-                    <div key={r.id} className="review-item">
-                      <div className="review-header">
-                        <Avatar name={r.reviewer} size={38} />
-                        <div className="reviewer-info">
-                          <div className="reviewer-name">{r.reviewer}</div>
-                          <div className="review-date">{new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
-                        </div>
-                        <StarRating rating={r.rating} />
-                      </div>
-                      <div className="review-comment">"{r.comment}"</div>
-                    </div>
-                  ))
-                )}
+            <div style={{ backgroundColor: theme.dangerBg, border: `1px solid rgba(239, 68, 68, 0.15)`, borderRadius: "16px", padding: "24px" }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.danger, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "12px" }}>⚠️ Danger Zone</div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button style={{ padding: "10px 16px", background: "none", color: theme.danger, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.05)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>Deactivate Account</button>
+                <button style={{ padding: "10px 16px", background: "none", color: theme.danger, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.05)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>Delete Account</button>
               </div>
-            )}
-
-            {/* Tab: Settings */}
-            {activeTab === "settings" && (
-              <>
-                <div className="section-card">
-                  <div className="section-title">Notifications</div>
-                  {[
-                    { label: "Ride Alerts", desc: "Get notified when a ride matches your route", on: true },
-                    { label: "Booking Updates", desc: "Confirmations and cancellation alerts", on: true },
-                    { label: "Promotions", desc: "Deals and offers from Ridivo", on: false },
-                    { label: "Review Reminders", desc: "Reminders to review past rides", on: true },
-                  ].map((s) => (
-                    <div key={s.label} className="setting-row">
-                      <div>
-                        <div className="setting-label">{s.label}</div>
-                        <div className="setting-desc">{s.desc}</div>
-                      </div>
-                      <div className={`toggle ${s.on ? "" : "off"}`}><div className="toggle-thumb" /></div>
-                    </div>
-                  ))}
-                </div>
-                <div className="section-card">
-                  <div className="section-title">Privacy</div>
-                  {[
-                    { label: "Show Phone Number", desc: "Visible to co-passengers after booking", on: false },
-                    { label: "Public Profile", desc: "Anyone can view your profile and reviews", on: true },
-                  ].map((s) => (
-                    <div key={s.label} className="setting-row">
-                      <div>
-                        <div className="setting-label">{s.label}</div>
-                        <div className="setting-desc">{s.desc}</div>
-                      </div>
-                      <div className={`toggle ${s.on ? "" : "off"}`}><div className="toggle-thumb" /></div>
-                    </div>
-                  ))}
-                </div>
-                <div className="danger-zone">
-                  <div className="danger-title">⚠️ Danger Zone</div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button className="btn-danger">Deactivate Account</button>
-                    <button className="btn-danger">Delete Account</button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {editOpen && <EditModal user={user} onClose={() => setEditOpen(false)} onSave={handleSave} />}
+
+      {formOpen && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(9, 60, 93, 0.4)", zIndex: 1000,
+          display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 32,
+            width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)",
+            fontFamily: "'DM Sans', sans-serif"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h3 style={{ color: theme.textPrimary, fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Sora', sans-serif" }}>
+                {editingContact ? "Edit Contact" : "Add Emergency Contact"}
+              </h3>
+              <button onClick={() => setFormOpen(false)} style={{ background: "none", border: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            {formError && (
+              <div style={{
+                backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`,
+                padding: "10px 14px", borderRadius: 8, fontSize: "12.5px", fontWeight: "600", marginBottom: 16
+              }}>
+                ⚠️ {formError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Full Name</label>
+              <input
+                value={contactForm.name}
+                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                placeholder="e.g. John Doe"
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Relationship</label>
+              <select
+                value={contactForm.relationship}
+                onChange={(e) => setContactForm({ ...contactForm, relationship: e.target.value })}
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box", cursor: "pointer"
+                }}
+              >
+                {["Parent", "Spouse", "Sibling", "Child", "Friend", "Other"].map((rel) => (
+                  <option key={rel} value={rel}>{rel}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Phone Number</label>
+              <input
+                value={contactForm.phone}
+                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                placeholder="e.g. +919876543210"
+                style={{
+                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
+                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button onClick={() => setFormOpen(false)} style={{
+                flex: 1, padding: "12px 0", borderRadius: 8, border: `1px solid ${theme.border}`,
+                background: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 14, fontWeight: "600"
+              }}>Cancel</button>
+              <button onClick={handleSaveContact} disabled={formSaving} style={{
+                flex: 1, padding: "12px 0", borderRadius: 8, border: "none",
+                background: formSaving ? theme.accent : theme.textPrimary, color: "#fff",
+                cursor: formSaving ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600
+              }}>
+                {formSaving ? "Saving..." : "Save Contact"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

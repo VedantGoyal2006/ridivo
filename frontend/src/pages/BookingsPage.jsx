@@ -1,122 +1,116 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     getMyBookings,
     getMyRides,
     getBookingsForRide,
     acceptBooking,
     rejectBooking,
-    cancelBooking
+    cancelBooking,
+    triggerSOS
 } from '../services/rideService';
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  AlertCircle,
+  Calendar,
+  ArrowRight,
+  User,
+  Users,
+  IndianRupee,
+  Car,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 
 const theme = {
-    bg: '#0F0F13',
-    bgCard: 'rgba(255,255,255,0.03)',
-    bgCardHover: 'rgba(255,255,255,0.06)',
-    border: 'rgba(255,255,255,0.08)',
-    borderGold: 'rgba(212,175,55,0.4)',
-    gold: '#D4AF37',
-    goldLight: 'rgba(212,175,55,0.15)',
-    goldGlow: 'rgba(212,175,55,0.08)',
-    textPrimary: '#F8F8F2',
-    textSecondary: '#94A3B8',
-    textMuted: '#64748B',
-    success: '#34D399',
-    successBg: 'rgba(52,211,153,0.1)',
-    warning: '#FBBF24',
-    warningBg: 'rgba(251,191,36,0.1)',
-    danger: '#F87171',
-    dangerBg: 'rgba(248,113,113,0.1)',
-    info: '#38BDF8',
-    infoBg: 'rgba(56,189,248,0.1)',
+    bgCard: '#FFFFFF',
+    border: '#E2E8F0',
+    textPrimary: '#093C5D',
+    textSecondary: '#6B7280',
+    textMuted: '#94A3B8',
+    accent: '#3B7597',
+    accentDark: '#093C5D',
+    accentLight: '#EFF6FF',
+    success: '#10B981',
+    successBg: '#EFFDF4',
+    warning: '#F59E0B',
+    warningBg: '#FEF3C7',
+    danger: '#EF4444',
+    dangerBg: '#FEE2E2',
+    info: '#3B7597',
+    infoBg: '#EFF6FF',
 };
 
 const statusConfig = (status) => {
     const map = {
-        CONFIRMED: { color: theme.success, bg: theme.successBg, icon: '✅' },
-        PENDING: { color: theme.warning, bg: theme.warningBg, icon: '⏳' },
-        CANCELLED: { color: theme.danger, bg: theme.dangerBg, icon: '❌' },
-        REJECTED: { color: theme.danger, bg: theme.dangerBg, icon: '🚫' },
-        COMPLETED: { color: theme.info, bg: theme.infoBg, icon: '🏁' },
+        CONFIRMED: { color: theme.success, bg: theme.successBg, icon: CheckCircle },
+        PENDING: { color: theme.warning, bg: theme.warningBg, icon: Clock },
+        CANCELLED: { color: theme.textSecondary, bg: '#F3F4F6', icon: XCircle },
+        REJECTED: { color: theme.danger, bg: theme.dangerBg, icon: XCircle },
+        COMPLETED: { color: theme.accentDark, bg: theme.accentLight, icon: CheckCircle },
     };
-    return map[status] || { color: theme.textSecondary, bg: theme.bgCard, icon: '❓' };
+    return map[status] || { color: theme.textSecondary, bg: '#F3F4F6', icon: AlertCircle };
 };
 
-function GoldDivider() {
-    return (
-        <div style={{
-            display: 'flex', alignItems: 'center', gap: '12px', margin: '28px 0'
-        }}>
-            <div style={{ flex: 1, height: '1px', background: `linear-gradient(to right, transparent, ${theme.borderGold})` }} />
-            <div style={{ width: '6px', height: '6px', backgroundColor: theme.gold, borderRadius: '50%', boxShadow: `0 0 8px ${theme.gold}` }} />
-            <div style={{ flex: 1, height: '1px', background: `linear-gradient(to left, transparent, ${theme.borderGold})` }} />
-        </div>
-    );
-}
-
-function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }) {
+function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject, onSOS }) {
     const status = statusConfig(booking.status);
-    const [expanded, setExpanded] = useState(false);
+    const StatusIcon = status.icon;
+    const [hovered, setHovered] = useState(false);
 
     return (
         <div style={{
             backgroundColor: theme.bgCard,
             borderRadius: '16px',
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${hovered ? theme.accent : theme.border}`,
             marginBottom: '16px',
             overflow: 'hidden',
-            transition: 'all 0.3s ease',
-            backdropFilter: 'blur(12px)',
+            transition: 'all 0.3s cubic-bezier(0.16,1,0.3,1)',
+            boxShadow: hovered ? "0 8px 24px rgba(9, 60, 93, 0.04)" : "0 2px 12px rgba(9, 60, 93, 0.01)",
+            transform: hovered ? "translateY(-2px)" : "translateY(0)"
         }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.border = `1px solid ${theme.borderGold}`;
-                e.currentTarget.style.boxShadow = `0 4px 24px ${theme.goldGlow}`;
-                e.currentTarget.style.backgroundColor = theme.bgCardHover;
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.border = `1px solid ${theme.border}`;
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.backgroundColor = theme.bgCard;
-            }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
         >
-            {/* Gold top accent line */}
-            <div style={{
-                height: '2px',
-                background: `linear-gradient(to right, transparent, ${theme.gold}, transparent)`,
-                opacity: booking.status === 'CONFIRMED' ? 1 : 0.3,
-            }} />
-
             <div style={{ padding: '20px 24px' }}>
                 {/* Header row */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', flexWrap: "wrap", gap: "12px" }}>
                     {/* Route */}
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: "wrap" }}>
                             <span style={{
-                                fontFamily: "'Playfair Display', serif",
-                                fontSize: '18px', fontWeight: '700',
+                                fontFamily: "'Sora', sans-serif",
+                                fontSize: '16px', fontWeight: '700',
                                 color: theme.textPrimary,
                             }}>
                                 {booking.origin}
                             </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <div style={{ width: '20px', height: '1px', backgroundColor: theme.gold }} />
-                                <div style={{ color: theme.gold, fontSize: '12px' }}>✈</div>
-                                <div style={{ width: '20px', height: '1px', backgroundColor: theme.gold }} />
-                            </div>
+                            <span style={{ color: theme.accent, fontWeight: "700" }}>→</span>
                             <span style={{
-                                fontFamily: "'Playfair Display', serif",
-                                fontSize: '18px', fontWeight: '700',
+                                fontFamily: "'Sora', sans-serif",
+                                fontSize: '16px', fontWeight: '700',
                                 color: theme.textPrimary,
                             }}>
                                 {booking.destination}
                             </span>
                         </div>
-                        <div style={{ fontSize: '12px', color: theme.textMuted, fontFamily: "'DM Sans', sans-serif" }}>
-                            {new Date(booking.departure_time).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <Calendar size={13} />
+                            {new Date(booking.departure_time).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                             {' · '}
                             {new Date(booking.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
+                        {/* Pickup/drop info if boarding mid-route */}
+                        {(booking.pickup_point || booking.drop_point) && (
+                            <div style={{ fontSize: '11.5px', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: "4px", marginTop: '4px' }}>
+                                <MapPin size={12} />
+                                {booking.pickup_point ? `Board at ${booking.pickup_point}` : 'Board at origin'}
+                                {booking.drop_point ? ` → Drop at ${booking.drop_point}` : ''}
+                            </div>
+                        )}
                     </div>
 
                     {/* Status badge */}
@@ -125,11 +119,11 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
                         padding: '6px 14px',
                         backgroundColor: status.bg,
                         borderRadius: '100px',
-                        border: `1px solid ${status.color}30`,
+                        border: `1px solid rgba(9, 60, 93, 0.03)`,
                     }}>
-                        <span style={{ fontSize: '12px' }}>{status.icon}</span>
+                        <StatusIcon size={12} style={{ color: status.color }} />
                         <span style={{
-                            fontSize: '12px', fontWeight: '700',
+                            fontSize: '11px', fontWeight: '700',
                             color: status.color,
                             fontFamily: "'DM Sans', sans-serif",
                             letterSpacing: '0.5px',
@@ -147,34 +141,41 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
                     marginBottom: '16px',
                 }}>
                     {[
-                        { label: isDriver ? 'TRAVELER' : 'DRIVER', value: isDriver ? booking.traveler_name : booking.driver_name, icon: '👤' },
-                        { label: 'SEATS', value: `${booking.seats_booked} seat${booking.seats_booked > 1 ? 's' : ''}`, icon: '💺' },
-                        { label: 'FARE', value: `₹${booking.total_fare}`, icon: '💰', gold: true },
-                    ].map((item) => (
-                        <div key={item.label} style={{
-                            backgroundColor: 'rgba(0,0,0,0.2)',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            border: item.gold ? `1px solid ${theme.borderGold}` : `1px solid ${theme.border}`,
-                        }}>
-                            <div style={{
-                                fontSize: '10px', fontWeight: '700',
-                                color: item.gold ? theme.gold : theme.textMuted,
-                                fontFamily: "'DM Sans', sans-serif",
-                                letterSpacing: '1px',
-                                marginBottom: '4px',
+                        { label: isDriver ? 'TRAVELER' : 'DRIVER', value: isDriver ? booking.traveler_name : booking.driver_name, icon: User },
+                        { label: 'SEATS', value: `${booking.seats_booked} seat${booking.seats_booked > 1 ? 's' : ''}`, icon: Users },
+                        { label: 'FARE', value: `₹${booking.total_fare}`, icon: IndianRupee, isFare: true },
+                    ].map((item, idx) => {
+                        const IconComp = item.icon;
+                        return (
+                            <div key={idx} style={{
+                                backgroundColor: '#F9FAFB',
+                                borderRadius: '10px',
+                                padding: '12px',
+                                border: `1px solid ${theme.border}`,
                             }}>
-                                {item.icon} {item.label}
+                                <div style={{
+                                    fontSize: '10px', fontWeight: '700',
+                                    color: theme.textSecondary,
+                                    fontFamily: "'DM Sans', sans-serif",
+                                    letterSpacing: '0.8px',
+                                    marginBottom: '4px',
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                }}>
+                                    <IconComp size={10} /> {item.label}
+                                </div>
+                                <div style={{
+                                    fontSize: '13.5px', fontWeight: '700',
+                                    color: item.isFare ? theme.success : theme.textPrimary,
+                                    fontFamily: "'DM Sans', sans-serif",
+                                    marginTop: "2px"
+                                }}>
+                                    {item.value}
+                                </div>
                             </div>
-                            <div style={{
-                                fontSize: '14px', fontWeight: '700',
-                                color: item.gold ? theme.gold : theme.textPrimary,
-                                fontFamily: "'DM Sans', sans-serif",
-                            }}>
-                                {item.value}
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Vehicle info */}
@@ -182,55 +183,55 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         padding: '8px 12px',
-                        backgroundColor: 'rgba(0,0,0,0.15)',
+                        backgroundColor: theme.accentLight,
                         borderRadius: '8px',
-                        border: `1px solid ${theme.border}`,
+                        border: `1px solid rgba(9, 60, 93, 0.03)`,
                         marginBottom: '16px',
                     }}>
-                        <span style={{ fontSize: '14px' }}>🚗</span>
-                        <span style={{ fontSize: '13px', color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
+                        <Car size={14} style={{ color: theme.textPrimary }} />
+                        <span style={{ fontSize: '12.5px', color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif", fontWeight: "500" }}>
                             {booking.vehicle_name} · {booking.vehicle_type} · {booking.vehicle_number}
                         </span>
                     </div>
                 )}
 
                 {/* Action buttons */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: "wrap" }}>
                     {/* Driver actions */}
                     {isDriver && booking.status === 'PENDING' && (
                         <>
                             <button
                                 onClick={() => onAccept(booking.id)}
                                 style={{
-                                    padding: '9px 20px',
+                                    padding: '9px 18px',
                                     backgroundColor: theme.successBg,
                                     color: theme.success,
-                                    border: `1px solid ${theme.success}40`,
+                                    border: `1px solid rgba(16, 185, 129, 0.2)`,
                                     borderRadius: '8px',
-                                    fontSize: '13px', fontWeight: '700',
+                                    fontSize: '12.5px', fontWeight: '700',
                                     cursor: 'pointer',
                                     fontFamily: "'DM Sans', sans-serif",
                                     transition: 'all 0.2s ease',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(52,211,153,0.2)'; e.currentTarget.style.boxShadow = `0 4px 12px rgba(52,211,153,0.2)`; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.successBg; e.currentTarget.style.boxShadow = 'none'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.successBg; }}
                             >
-                                ✓ Accept
+                                ✓ Accept Request
                             </button>
                             <button
                                 onClick={() => onReject(booking.id)}
                                 style={{
-                                    padding: '9px 20px',
+                                    padding: '9px 18px',
                                     backgroundColor: theme.dangerBg,
                                     color: theme.danger,
-                                    border: `1px solid ${theme.danger}40`,
+                                    border: `1px solid rgba(239, 68, 68, 0.2)`,
                                     borderRadius: '8px',
-                                    fontSize: '13px', fontWeight: '700',
+                                    fontSize: '12.5px', fontWeight: '700',
                                     cursor: 'pointer',
                                     fontFamily: "'DM Sans', sans-serif",
                                     transition: 'all 0.2s ease',
                                 }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(248,113,113,0.2)'; }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.dangerBg; }}
                             >
                                 ✕ Reject
@@ -238,26 +239,48 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
                         </>
                     )}
 
-                    {/* Traveler cancel */}
+                    {/* Traveler cancel + SOS */}
                     {!isDriver && ['PENDING', 'CONFIRMED'].includes(booking.status) && (
-                        <button
-                            onClick={() => onCancel(booking.id)}
-                            style={{
-                                padding: '9px 20px',
-                                backgroundColor: 'transparent',
-                                color: theme.textSecondary,
-                                border: `1px solid ${theme.border}`,
-                                borderRadius: '8px',
-                                fontSize: '13px', fontWeight: '600',
-                                cursor: 'pointer',
-                                fontFamily: "'DM Sans', sans-serif",
-                                transition: 'all 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.color = theme.danger; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; }}
-                        >
-                            Cancel Booking
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: "wrap" }}>
+                            {booking.status === 'CONFIRMED' && (
+                                <button
+                                    onClick={() => onSOS(booking)}
+                                    style={{
+                                        padding: '9px 18px',
+                                        backgroundColor: theme.dangerBg,
+                                        color: theme.danger,
+                                        border: `1px solid rgba(239, 68, 68, 0.2)`,
+                                        borderRadius: '8px',
+                                        fontSize: '12.5px', fontWeight: '700',
+                                        cursor: 'pointer',
+                                        fontFamily: "'DM Sans', sans-serif",
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                                >
+                                    🚨 Emergency SOS
+                                </button>
+                            )}
+                            <button
+                                onClick={() => onCancel(booking.id)}
+                                style={{
+                                    padding: '9px 18px',
+                                    backgroundColor: 'transparent',
+                                    color: theme.textSecondary,
+                                    border: `1px solid ${theme.border}`,
+                                    borderRadius: '8px',
+                                    fontSize: '12.5px', fontWeight: '600',
+                                    cursor: 'pointer',
+                                    fontFamily: "'DM Sans', sans-serif",
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.color = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >
+                                Cancel Booking
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -267,15 +290,55 @@ function BookingCard({ booking, onCancel, isDriver = false, onAccept, onReject }
 
 export default function BookingsPage() {
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const defaultTab = params.get('tab') || 'my';
 
     const [myBookings, setMyBookings] = useState([]);
     const [myRides, setMyRides] = useState([]);
     const [rideBookings, setRideBookings] = useState([]);
     const [selectedRide, setSelectedRide] = useState(null);
-    const [activeTab, setActiveTab] = useState('my');
+    const [activeTab, setActiveTab] = useState(defaultTab);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(true);
+
+    // SOS State Variables
+    const [sosBooking, setSosBooking] = useState(null);
+    const [sosConfirmOpen, setSosConfirmOpen] = useState(false);
+    const [sosLoading, setSosLoading] = useState(false);
+    const [sosAlertText, setSosAlertText] = useState('');
+
+    const handleSOS = (booking) => {
+        setSosBooking(booking);
+        setSosConfirmOpen(true);
+        setSosAlertText('');
+        setError('');
+        setSuccess('');
+    };
+
+    const confirmSOS = async () => {
+        if (!sosBooking) return;
+        setSosLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const data = await triggerSOS(sosBooking.id);
+            setSosAlertText(data.alertText);
+            setSuccess(data.message);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to dispatch SOS alert.');
+        } finally {
+            setSosLoading(false);
+            setSosConfirmOpen(false);
+        }
+    };
+
+    useEffect(() => {
+        const tab = params.get('tab') || 'my';
+        setActiveTab(tab);
+    }, [location.search]);
 
     useEffect(() => {
         if (user) {
@@ -351,339 +414,390 @@ export default function BookingsPage() {
 
     return (
         <>
-            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+            <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-            <div style={{
-                minHeight: '100vh',
-                backgroundColor: theme.bg,
-                backgroundImage: `
-                    radial-gradient(ellipse at 20% 0%, rgba(212,175,55,0.06) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 100%, rgba(212,175,55,0.04) 0%, transparent 50%),
-                    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)
-                `,
-                backgroundSize: '100% 100%, 100% 100%, 50px 50px, 50px 50px',
-                backgroundAttachment: 'fixed',
-                fontFamily: "'DM Sans', sans-serif",
-                paddingTop: '80px',
-                color: theme.textPrimary,
-            }}>
-                <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px 20px' }}>
+            <div style={{ maxWidth: '860px', margin: '0 auto' }}>
 
-                    {/* Hero Header */}
-                    <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-                        <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '8px',
-                            padding: '6px 16px',
-                            backgroundColor: theme.goldLight,
-                            border: `1px solid ${theme.borderGold}`,
-                            borderRadius: '100px',
-                            marginBottom: '16px',
-                        }}>
-                            <div style={{ width: '6px', height: '6px', backgroundColor: theme.gold, borderRadius: '50%', boxShadow: `0 0 6px ${theme.gold}` }} />
-                            <span style={{ fontSize: '12px', fontWeight: '600', color: theme.gold, letterSpacing: '1px' }}>
-                                BOOKING MANAGER
-                            </span>
-                        </div>
+                {/* Hero Header */}
+                <div style={{
+                    background: `linear-gradient(135deg, ${theme.accentDark} 0%, ${theme.accent} 100%)`,
+                    borderRadius: '20px',
+                    padding: '36px 32px',
+                    marginBottom: '28px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: '0 8px 30px rgba(9, 60, 93, 0.05)',
+                }}>
+                    <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(255,255,255,0.1), transparent)', borderRadius: '50%' }} />
 
-                        <h1 style={{
-                            fontFamily: "'Playfair Display', serif",
-                            fontSize: '38px', fontWeight: '800',
-                            color: theme.textPrimary,
-                            margin: '0 0 10px',
-                            lineHeight: 1.2,
-                        }}>
-                            Your Journey,{' '}
-                            <span style={{
-                                background: `linear-gradient(135deg, ${theme.gold}, #F0D060)`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                            }}>
-                                Managed.
-                            </span>
+                    <div style={{ position: 'relative', zIndex: 1, color: "white" }}>
+                        <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: '28px', fontWeight: '800', color: 'white', margin: '0 0 8px' }}>
+                            🎫 Booking Manager
                         </h1>
-                        <p style={{ color: theme.textSecondary, fontSize: '15px', margin: 0 }}>
-                            Track and manage all your ride bookings in one place
+                        <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '15px', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                            Track and manage all your ride bookings and requests in one place.
                         </p>
                     </div>
-
-                    {/* Stats Row */}
-                    <div style={{
-                        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '16px', marginBottom: '32px',
-                    }}>
-                        {[
-                            {
-                                label: 'Total Bookings',
-                                value: myBookings.length,
-                                icon: '📋',
-                                color: theme.info,
-                            },
-                            {
-                                label: 'Confirmed',
-                                value: myBookings.filter(b => b.status === 'CONFIRMED').length,
-                                icon: '✅',
-                                color: theme.success,
-                            },
-                            {
-                                label: 'Pending',
-                                value: myBookings.filter(b => b.status === 'PENDING').length,
-                                icon: '⏳',
-                                color: theme.warning,
-                            },
-                        ].map((stat) => (
-                            <div key={stat.label} style={{
-                                backgroundColor: theme.bgCard,
-                                backdropFilter: 'blur(12px)',
-                                borderRadius: '14px',
-                                border: `1px solid ${theme.border}`,
-                                padding: '20px',
-                                textAlign: 'center',
-                                transition: 'all 0.2s ease',
-                            }}
-                                onMouseEnter={(e) => { e.currentTarget.style.border = `1px solid ${theme.borderGold}`; e.currentTarget.style.boxShadow = `0 4px 20px ${theme.goldGlow}`; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.border = `1px solid ${theme.border}`; e.currentTarget.style.boxShadow = 'none'; }}
-                            >
-                                <div style={{ fontSize: '28px', marginBottom: '8px' }}>{stat.icon}</div>
-                                <div style={{
-                                    fontFamily: "'Playfair Display', serif",
-                                    fontSize: '28px', fontWeight: '800',
-                                    color: stat.color, lineHeight: 1,
-                                    marginBottom: '4px',
-                                }}>{stat.value}</div>
-                                <div style={{ fontSize: '12px', color: theme.textMuted, letterSpacing: '0.5px' }}>{stat.label}</div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Messages */}
-                    {error && (
-                        <div style={{
-                            backgroundColor: theme.dangerBg,
-                            border: `1px solid ${theme.danger}30`,
-                            borderRadius: '10px', padding: '12px 16px',
-                            marginBottom: '20px', color: theme.danger,
-                            fontSize: '13.5px', display: 'flex',
-                            alignItems: 'center', gap: '8px',
-                        }}>
-                            ⚠️ {error}
-                        </div>
-                    )}
-                    {success && (
-                        <div style={{
-                            backgroundColor: theme.successBg,
-                            border: `1px solid ${theme.success}30`,
-                            borderRadius: '10px', padding: '12px 16px',
-                            marginBottom: '20px', color: theme.success,
-                            fontSize: '13.5px', display: 'flex',
-                            alignItems: 'center', gap: '8px',
-                        }}>
-                            ✨ {success}
-                        </div>
-                    )}
-
-                    {/* Tabs */}
-                    <div style={{
-                        display: 'flex', gap: '4px',
-                        marginBottom: '24px',
-                        backgroundColor: 'rgba(0,0,0,0.3)',
-                        padding: '4px', borderRadius: '12px',
-                        border: `1px solid ${theme.border}`,
-                        width: 'fit-content',
-                    }}>
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => { setActiveTab(tab.id); setError(''); setSuccess(''); setSelectedRide(null); }}
-                                style={{
-                                    padding: '10px 22px',
-                                    border: 'none',
-                                    borderRadius: '9px',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    fontFamily: "'DM Sans', sans-serif",
-                                    transition: 'all 0.25s ease',
-                                    backgroundColor: activeTab === tab.id ? theme.goldLight : 'transparent',
-                                    color: activeTab === tab.id ? theme.gold : theme.textSecondary,
-                                    border: activeTab === tab.id ? `1px solid ${theme.borderGold}` : '1px solid transparent',
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                }}
-                            >
-                                {tab.label}
-                                <span style={{
-                                    padding: '2px 8px',
-                                    backgroundColor: activeTab === tab.id ? theme.gold : 'rgba(255,255,255,0.1)',
-                                    color: activeTab === tab.id ? '#0F0F13' : theme.textMuted,
-                                    borderRadius: '100px',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                }}>
-                                    {tab.count}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* My Bookings Tab */}
-                    {activeTab === 'my' && (
-                        <div>
-                            <GoldDivider />
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '60px', color: theme.textSecondary }}>
-                                    Loading your bookings...
-                                </div>
-                            ) : myBookings.length === 0 ? (
-                                <div style={{
-                                    backgroundColor: theme.bgCard,
-                                    borderRadius: '16px',
-                                    border: `1px solid ${theme.border}`,
-                                    padding: '60px 40px',
-                                    textAlign: 'center',
-                                }}>
-                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
-                                    <p style={{
-                                        fontFamily: "'Playfair Display', serif",
-                                        fontSize: '20px', color: theme.textPrimary,
-                                        margin: '0 0 8px',
-                                    }}>No bookings yet</p>
-                                    <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0 }}>
-                                        Find a ride and book your first journey
-                                    </p>
-                                </div>
-                            ) : (
-                                myBookings.map((booking) => (
-                                    <BookingCard
-                                        key={booking.id}
-                                        booking={booking}
-                                        onCancel={handleCancel}
-                                        isDriver={false}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    )}
-
-                    {/* Driver Tab */}
-                    {activeTab === 'driver' && (
-                        <div>
-                            <GoldDivider />
-                            {myRides.length === 0 ? (
-                                <div style={{
-                                    backgroundColor: theme.bgCard,
-                                    borderRadius: '16px',
-                                    border: `1px solid ${theme.border}`,
-                                    padding: '60px 40px',
-                                    textAlign: 'center',
-                                }}>
-                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-                                    <p style={{
-                                        fontFamily: "'Playfair Display', serif",
-                                        fontSize: '20px', color: theme.textPrimary,
-                                        margin: '0 0 8px',
-                                    }}>No rides posted yet</p>
-                                    <p style={{ color: theme.textMuted, fontSize: '14px', margin: 0 }}>
-                                        Post a ride to start receiving booking requests
-                                    </p>
-                                </div>
-                            ) : (
-                                myRides.map((ride) => (
-                                    <div key={ride.id} style={{
-                                        backgroundColor: theme.bgCard,
-                                        backdropFilter: 'blur(12px)',
-                                        borderRadius: '16px',
-                                        border: `1px solid ${theme.border}`,
-                                        marginBottom: '16px',
-                                        overflow: 'hidden',
-                                        transition: 'all 0.2s ease',
-                                    }}>
-                                        {/* Gold accent */}
-                                        <div style={{ height: '2px', background: `linear-gradient(to right, transparent, ${theme.gold}, transparent)`, opacity: 0.5 }} />
-
-                                        <div style={{ padding: '20px 24px' }}>
-                                            {/* Ride header */}
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '17px', fontWeight: '700', color: theme.textPrimary }}>{ride.origin}</span>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <div style={{ width: '16px', height: '1px', backgroundColor: theme.gold }} />
-                                                        <div style={{ color: theme.gold, fontSize: '10px' }}>✈</div>
-                                                        <div style={{ width: '16px', height: '1px', backgroundColor: theme.gold }} />
-                                                    </div>
-                                                    <span style={{ fontFamily: "'Playfair Display', serif", fontSize: '17px', fontWeight: '700', color: theme.textPrimary }}>{ride.destination}</span>
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <span style={{ fontSize: '12px', color: theme.textMuted }}>
-                                                        {ride.available_seats}/{ride.total_seats} seats
-                                                    </span>
-                                                    <button
-                                                        onClick={() => selectedRide === ride.id ? setSelectedRide(null) : fetchRideBookings(ride.id)}
-                                                        style={{
-                                                            padding: '8px 16px',
-                                                            backgroundColor: selectedRide === ride.id ? theme.goldLight : 'rgba(0,0,0,0.3)',
-                                                            color: selectedRide === ride.id ? theme.gold : theme.textSecondary,
-                                                            border: `1px solid ${selectedRide === ride.id ? theme.borderGold : theme.border}`,
-                                                            borderRadius: '8px',
-                                                            fontSize: '13px', fontWeight: '600',
-                                                            cursor: 'pointer',
-                                                            fontFamily: "'DM Sans', sans-serif",
-                                                            transition: 'all 0.2s ease',
-                                                        }}
-                                                    >
-                                                        {selectedRide === ride.id ? 'Hide ↑' : 'View Requests ↓'}
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Booking requests */}
-                                            {selectedRide === ride.id && (
-                                                <div style={{
-                                                    borderTop: `1px solid ${theme.border}`,
-                                                    paddingTop: '16px',
-                                                    marginTop: '4px',
-                                                }}>
-                                                    {rideBookings.length === 0 ? (
-                                                        <p style={{ color: theme.textMuted, fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>
-                                                            No booking requests yet
-                                                        </p>
-                                                    ) : (
-                                                        rideBookings.map((booking) => (
-                                                            <BookingCard
-                                                                key={booking.id}
-                                                                booking={{
-                                                                    ...booking,
-                                                                    origin: ride.origin,
-                                                                    destination: ride.destination,
-                                                                    departure_time: ride.departure_time,
-                                                                    vehicle_name: ride.vehicle_name,
-                                                                    vehicle_type: ride.vehicle_type,
-                                                                    vehicle_number: ride.vehicle_number,
-                                                                }}
-                                                                isDriver={true}
-                                                                onAccept={handleAccept}
-                                                                onReject={handleReject}
-                                                                onCancel={() => {}}
-                                                            />
-                                                        ))
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    )}
                 </div>
+
+                {/* Stats Row */}
+                <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '16px', marginBottom: '28px',
+                }}>
+                    {[
+                        {
+                            label: 'Total Bookings',
+                            value: myBookings.length,
+                            icon: '📋',
+                            color: theme.info,
+                        },
+                        {
+                            label: 'Confirmed',
+                            value: myBookings.filter(b => b.status === 'CONFIRMED').length,
+                            icon: '✅',
+                            color: theme.success,
+                        },
+                        {
+                            label: 'Pending Approval',
+                            value: myBookings.filter(b => b.status === 'PENDING').length,
+                            icon: '⏳',
+                            color: theme.warning,
+                        },
+                    ].map((stat, i) => (
+                        <div key={i} style={{
+                            backgroundColor: theme.bgCard,
+                            borderRadius: '16px',
+                            border: `1px solid ${theme.border}`,
+                            padding: '20px',
+                            textAlign: 'center',
+                        }}>
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>{stat.icon}</div>
+                            <div style={{
+                                fontFamily: "'Sora', sans-serif",
+                                fontSize: '24px', fontWeight: '800',
+                                color: theme.textPrimary, lineHeight: 1,
+                                marginBottom: '4px',
+                            }}>{stat.value}</div>
+                            <div style={{ fontSize: '12px', color: theme.textSecondary, fontWeight: "600" }}>{stat.label}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Alerts */}
+                {error && (
+                    <div style={{
+                        backgroundColor: theme.dangerBg,
+                        border: `1px solid rgba(239, 68, 68, 0.2)`,
+                        borderRadius: '10px', padding: '12px 16px',
+                        marginBottom: '20px', color: theme.danger,
+                        fontSize: '13.5px', display: 'flex',
+                        alignItems: 'center', gap: '8px',
+                        fontWeight: "600",
+                    }}>
+                        <AlertCircle size={16} /> {error}
+                    </div>
+                )}
+                {success && (
+                    <div style={{
+                        backgroundColor: theme.successBg,
+                        border: `1px solid rgba(16, 185, 129, 0.2)`,
+                        borderRadius: '10px', padding: '12px 16px',
+                        marginBottom: '20px', color: theme.success,
+                        fontSize: '13.5px', display: 'flex',
+                        alignItems: 'center', gap: '8px',
+                        fontWeight: "600",
+                    }}>
+                        <CheckCircle size={16} /> {success}
+                    </div>
+                )}
+
+                {/* Tabs */}
+                <div style={{
+                    display: 'flex', gap: '4px',
+                    marginBottom: '28px',
+                    backgroundColor: 'rgba(9, 60, 93, 0.03)',
+                    padding: '4px', borderRadius: '12px',
+                    border: `1px solid ${theme.border}`,
+                    width: 'fit-content',
+                }}>
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => { setActiveTab(tab.id); setError(''); setSuccess(''); setSelectedRide(null); }}
+                            style={{
+                                padding: '10px 22px',
+                                border: 'none',
+                                borderRadius: '9px',
+                                cursor: 'pointer',
+                                fontSize: '13.5px',
+                                fontWeight: '600',
+                                fontFamily: "'DM Sans', sans-serif",
+                                transition: 'all 0.25s ease',
+                                backgroundColor: activeTab === tab.id ? theme.bgCard : 'transparent',
+                                color: activeTab === tab.id ? theme.textPrimary : theme.textSecondary,
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                boxShadow: activeTab === tab.id ? "0 4px 10px rgba(9, 60, 93, 0.03)" : "none"
+                            }}
+                        >
+                            {tab.label}
+                            <span style={{
+                                padding: '2px 8px',
+                                backgroundColor: activeTab === tab.id ? theme.textPrimary : 'rgba(9, 60, 93, 0.1)',
+                                color: activeTab === tab.id ? 'white' : theme.textSecondary,
+                                borderRadius: '100px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                            }}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* My Bookings Tab */}
+                {activeTab === 'my' && (
+                    <div>
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '60px', color: theme.textSecondary }}>
+                                Loading your bookings...
+                            </div>
+                        ) : myBookings.length === 0 ? (
+                            <div style={{
+                                backgroundColor: theme.bgCard,
+                                borderRadius: '16px',
+                                border: `1px solid ${theme.border}`,
+                                padding: '60px 40px',
+                                textAlign: 'center',
+                                boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
+                            }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎫</div>
+                                <p style={{
+                                    fontFamily: "'Sora', sans-serif",
+                                    fontSize: '18px', color: theme.textPrimary,
+                                    margin: '0 0 8px', fontWeight: "700"
+                                }}>No bookings yet</p>
+                                <p style={{ color: theme.textSecondary, fontSize: '14px', margin: 0 }}>
+                                    Find a ride and book your first journey.
+                                </p>
+                                <button onClick={() => navigate('/rides')} style={{ marginTop: "16px", padding: "10px 20px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Find a Ride</button>
+                            </div>
+                        ) : (
+                            myBookings.map((booking) => (
+                                <BookingCard
+                                    key={booking.id}
+                                    booking={booking}
+                                    onCancel={handleCancel}
+                                    isDriver={false}
+                                    onSOS={handleSOS}
+                                />
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {/* Driver Tab */}
+                {activeTab === 'driver' && (
+                    <div>
+                        {myRides.length === 0 ? (
+                            <div style={{
+                                backgroundColor: theme.bgCard,
+                                borderRadius: '16px',
+                                border: `1px solid ${theme.border}`,
+                                padding: '60px 40px',
+                                textAlign: 'center',
+                                boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '16px' }}>
+                                    <Car size={48} />
+                                </div>
+                                <p style={{
+                                    fontFamily: "'Sora', sans-serif",
+                                    fontSize: '18px', color: theme.textPrimary,
+                                    margin: '0 0 8px', fontWeight: "700"
+                                }}>No rides offered yet</p>
+                                <p style={{ color: theme.textSecondary, fontSize: '14px', margin: 0 }}>
+                                    Offer a ride to start receiving bookings from co-travelers.
+                                </p>
+                                <button onClick={() => navigate('/rides?tab=post')} style={{ marginTop: "16px", padding: "10px 20px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Offer a Ride</button>
+                            </div>
+                        ) : (
+                            myRides.map((ride) => (
+                                <div key={ride.id} style={{
+                                    backgroundColor: theme.bgCard,
+                                    borderRadius: '16px',
+                                    border: `1px solid ${theme.border}`,
+                                    marginBottom: '16px',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
+                                }}>
+                                    <div style={{ padding: '20px 24px' }}>
+                                        {/* Ride header */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: "wrap", gap: "12px" }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '15px', fontWeight: '700', color: theme.textPrimary }}>{ride.origin}</span>
+                                                <span style={{ color: theme.accent, fontWeight: "700" }}>→</span>
+                                                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '15px', fontWeight: '700', color: theme.textPrimary }}>{ride.destination}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{ fontSize: '12px', color: theme.textSecondary, fontWeight: "500" }}>
+                                                    {ride.available_seats}/{ride.total_seats} seats remaining
+                                                </span>
+                                                <button
+                                                    onClick={() => selectedRide === ride.id ? setSelectedRide(null) : fetchRideBookings(ride.id)}
+                                                    style={{
+                                                        padding: '8px 16px',
+                                                        backgroundColor: selectedRide === ride.id ? theme.accentLight : 'white',
+                                                        color: theme.textPrimary,
+                                                        border: `1px solid ${theme.border}`,
+                                                        borderRadius: '8px',
+                                                        fontSize: '12.5px', fontWeight: '700',
+                                                        cursor: 'pointer',
+                                                        fontFamily: "'DM Sans', sans-serif",
+                                                        transition: 'all 0.2s ease',
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "4px"
+                                                    }}
+                                                >
+                                                    {selectedRide === ride.id ? 'Hide Requests' : 'View Requests'}
+                                                    {selectedRide === ride.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Booking requests list */}
+                                        {selectedRide === ride.id && (
+                                            <div style={{
+                                                borderTop: `1px solid ${theme.border}`,
+                                                paddingTop: '16px',
+                                                marginTop: '4px',
+                                            }}>
+                                                {rideBookings.length === 0 ? (
+                                                    <p style={{ color: theme.textSecondary, fontSize: '13px', textAlign: 'center', padding: '20px 0', fontStyle: "italic" }}>
+                                                        No booking requests for this ride yet.
+                                                    </p>
+                                                ) : (
+                                                    rideBookings.map((booking) => (
+                                                        <BookingCard
+                                                            key={booking.id}
+                                                            booking={{
+                                                                ...booking,
+                                                                origin: ride.origin,
+                                                                destination: ride.destination,
+                                                                departure_time: ride.departure_time,
+                                                                vehicle_name: ride.vehicle_name,
+                                                                vehicle_type: ride.vehicle_type,
+                                                                vehicle_number: ride.vehicle_number,
+                                                            }}
+                                                            isDriver={true}
+                                                            onAccept={handleAccept}
+                                                            onReject={handleReject}
+                                                            onCancel={() => {}}
+                                                        />
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
             </div>
 
-            <style>{`
-                * { box-sizing: border-box; }
-                ::-webkit-scrollbar { width: 6px; }
-                ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 10px; }
-                ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.5); }
-            `}</style>
+            {/* SOS Confirmation Modal */}
+            {sosConfirmOpen && (
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+                    backdropFilter: 'blur(4px)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                        borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '440px',
+                        boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+                    }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '24px' }}>🚨</div>
+                            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.textPrimary, margin: 0 }}>
+                                Confirm SOS Emergency Alert
+                            </h3>
+                        </div>
+                        <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                            Are you sure you want to send an emergency alert to your trusted contacts? This will instantly compile and dispatch your current passenger, driver, vehicle, and trip route details via simulated SMS.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                                onClick={() => setSosConfirmOpen(false)}
+                                style={{
+                                    flex: 1, padding: '12px', border: `1px solid ${theme.border}`,
+                                    backgroundColor: 'white', color: theme.textSecondary,
+                                    borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmSOS}
+                                disabled={sosLoading}
+                                style={{
+                                    flex: 1, padding: '12px', border: 'none',
+                                    backgroundColor: theme.danger, color: 'white',
+                                    borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                                }}
+                            >
+                                {sosLoading ? 'Sending Alert...' : 'Send Alert'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SOS Success & Alert Text Modal */}
+            {sosAlertText && (
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(9, 60, 93, 0.4)',
+                    backdropFilter: 'blur(4px)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', border: `1px solid ${theme.border}`,
+                        borderRadius: '16px', padding: '32px', width: '90%', maxWidth: '500px',
+                        boxShadow: '0 20px 50px rgba(9, 60, 93, 0.15)', fontFamily: "'DM Sans', sans-serif"
+                    }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+                            <div style={{ fontSize: '24px' }}>✅</div>
+                            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '700', color: theme.success, margin: 0 }}>
+                                Emergency Alert Dispatched
+                            </h3>
+                        </div>
+                        <p style={{ color: theme.textSecondary, fontSize: '14.5px', lineHeight: '1.6', marginBottom: '16px' }}>
+                            Your emergency contacts have been notified with the following trip safety information:
+                        </p>
+                        <div style={{
+                            backgroundColor: '#F9FAFB', border: `1px solid ${theme.border}`,
+                            borderRadius: '10px', padding: '16px', whiteSpace: 'pre-wrap',
+                            fontSize: '12.5px', fontFamily: 'monospace', color: theme.textPrimary,
+                            maxHeight: '220px', overflowY: 'auto', marginBottom: '24px'
+                        }}>
+                            {sosAlertText}
+                        </div>
+                        <button
+                            onClick={() => setSosAlertText('')}
+                            style={{
+                                width: '100%', padding: '12px', border: 'none',
+                                backgroundColor: theme.textPrimary, color: 'white',
+                                borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                            }}
+                        >
+                            Close Window
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -6,6 +6,7 @@ import {
     getMyRides as getMyRidesFromDB,
     updateRide as updateRideInDB,
     cancelRide as cancelRideInDB,
+    completeRide as completeRideInDB,
     addWaypoints as addWaypointsInDB,
     hasConfirmedBookings
 } from '../models/rideModel.js';
@@ -105,7 +106,7 @@ export const searchRides = async (req, res) => {
 // GET /api/rides/my-rides
 export const getMyRides = async (req, res) => {
     try {
-        const rides = await getMyRidesInDB(req.user.id);
+        const rides = await getMyRidesFromDB(req.user.id);
 
         return res.status(200).json({
             message: 'Rides fetched successfully',
@@ -229,6 +230,46 @@ export const deleteRide = async (req, res) => {
 
     } catch (err) {
         console.error('deleteRide error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// PUT /api/rides/:id/complete
+export const completeRide = async (req, res) => {
+    try {
+        // 1. Check ride exists
+        const ride = await getRideFromDB(req.params.id);
+
+        if (!ride) {
+            return res.status(404).json({
+                message: 'Ride not found'
+            });
+        }
+
+        // 2. Check this driver owns this ride
+        if (ride.driver_id !== req.user.id) {
+            return res.status(403).json({
+                message: 'You are not the driver of this ride'
+            });
+        }
+
+        // 3. Check ride is active
+        if (ride.status !== 'ACTIVE') {
+            return res.status(400).json({
+                message: `This ride is ${ride.status.toLowerCase()} and cannot be completed`
+            });
+        }
+
+        // 4. Complete the ride
+        const completed = await completeRideInDB(req.params.id);
+
+        return res.status(200).json({
+            message: 'Ride completed successfully',
+            ride: completed
+        });
+
+    } catch (err) {
+        console.error('completeRide error:', err.message);
         return res.status(500).json({ message: 'Server error' });
     }
 };
