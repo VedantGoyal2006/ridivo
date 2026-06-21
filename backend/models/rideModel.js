@@ -21,24 +21,24 @@ export const createRide = async (rideData) => {
 const price_per_seat = parseFloat(total_trip_cost) / (parseInt(total_seats) + 1);
     const result = await pool.query(
         `INSERT INTO rides (
-            driver_id, vehicle_id, origin, destination,
-            origin_lat, origin_lng, destination_lat, destination_lng,
-            departure_time, estimated_duration, total_seats,
-            available_seats, total_trip_cost, price_per_seat,
-            description, status
-        ) VALUES (
-            $1, $2, $3, $4,
-            $5, $6, $7, $8,
-            $9, $10, $11,
-            $11, $12, $13,
-            $14, 'ACTIVE'
-        ) RETURNING *`,
-        [
-            driver_id, vehicle_id, origin, destination,
-            origin_lat, origin_lng, destination_lat, destination_lng,
-            departure_time, estimated_duration, total_seats,
-            total_trip_cost, price_per_seat, description
-        ]
+    driver_id, vehicle_id, origin, destination,
+    origin_lat, origin_lng, destination_lat, destination_lng,
+    departure_time, estimated_duration, total_seats,
+    available_seats, total_trip_cost, price_per_seat,
+    description, status, total_distance
+) VALUES (
+    $1, $2, $3, $4,
+    $5, $6, $7, $8,
+    $9, $10, $11,
+    $11, $12, $13,
+    $14, 'ACTIVE', $15
+) RETURNING *`,
+[
+    driver_id, vehicle_id, origin, destination,
+    origin_lat, origin_lng, destination_lat, destination_lng,
+    departure_time, estimated_duration, total_seats,
+    total_trip_cost, price_per_seat, description, rideData.total_distance || 0
+]
     );
 
     return result.rows[0];
@@ -136,7 +136,7 @@ export const updateRide = async (id, rideData) => {
     const price_per_seat = parseFloat(total_trip_cost) / (parseInt(total_seats) + 1);
 
     const result = await pool.query(
-        `UPDATE rides SET
+       `UPDATE rides SET
             origin = $1,
             destination = $2,
             origin_lat = $3,
@@ -149,8 +149,9 @@ export const updateRide = async (id, rideData) => {
             total_trip_cost = $10,
             price_per_seat = $11,
             description = $12,
+            total_distance = $13,
             updated_at = NOW()
-         WHERE id = $13
+         WHERE id = $14
          RETURNING *`,
         [
             origin,
@@ -165,6 +166,7 @@ export const updateRide = async (id, rideData) => {
             total_trip_cost,
             price_per_seat,
             description,
+            rideData.total_distance || 0,
             id
         ]
     );

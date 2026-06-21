@@ -7,12 +7,11 @@ export const createBooking = async (ride_id, traveler_id, seats_booked, pickup_p
     try {
         await client.query('BEGIN');
 
-        const rideResult = await client.query(
-            `SELECT available_seats, price_per_seat, status
-             FROM rides WHERE id = $1 FOR UPDATE`,
-            [ride_id]
-        );
-
+const rideResult = await client.query(
+    `SELECT available_seats, price_per_seat, status, total_distance, total_trip_cost, origin, destination
+     FROM rides WHERE id = $1 FOR UPDATE`,
+    [ride_id]
+);
         if (rideResult.rows.length === 0) {
             throw new Error('Ride not found');
         }
@@ -32,23 +31,28 @@ export const createBooking = async (ride_id, traveler_id, seats_booked, pickup_p
 let total_fare = ride.price_per_seat * seats_booked;
 
 if (pickup_point && drop_point && ride.total_distance) {
-    // Get distances for pickup and drop points
-    const pickupWaypoint = await client.query(
-        `SELECT distance_from_origin FROM ride_waypoints 
-         WHERE ride_id = $1 AND LOWER(location_name) = LOWER($2)`,
-        [ride_id, pickup_point]
-    );
-    const dropWaypoint = await client.query(
-        `SELECT distance_from_origin FROM ride_waypoints 
-         WHERE ride_id = $1 AND LOWER(location_name) = LOWER($2)`,
-        [ride_id, drop_point]
-    );
 
-    if (pickupWaypoint.rows.length > 0 && dropWaypoint.rows.length > 0) {
-        const pickupDist = parseFloat(pickupWaypoint.rows[0].distance_from_origin);
-        const dropDist = parseFloat(dropWaypoint.rows[0].distance_from_origin);
+    const getDistance = async (pointName) => {
+        if (pointName.toLowerCase() === ride.origin.toLowerCase()) {
+            return 0;
+        }
+        if (pointName.toLowerCase() === ride.destination.toLowerCase()) {
+            return parseFloat(ride.total_distance);
+        }
+        const wp = await client.query(
+            `SELECT distance_from_origin FROM ride_waypoints 
+             WHERE ride_id = $1 AND LOWER(location_name) = LOWER($2)`,
+            [ride_id, pointName]
+        );
+        return wp.rows.length > 0 ? parseFloat(wp.rows[0].distance_from_origin) : null;
+    };
+
+    const pickupDist = await getDistance(pickup_point);
+    const dropDist = await getDistance(drop_point);
+
+    if (pickupDist !== null && dropDist !== null) {
         const travelDist = dropDist - pickupDist;
-        const proportion = travelDist / ride.total_distance;
+        const proportion = travelDist / parseFloat(ride.total_distance);
         total_fare = ride.total_trip_cost * proportion * seats_booked;
         total_fare = Math.round(total_fare);
     }
