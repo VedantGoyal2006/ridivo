@@ -51,9 +51,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/vehicles', vehicleRoutes);
+
 app.use('/api/rides', rideRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/ai', aiRoutes);
+
 app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
