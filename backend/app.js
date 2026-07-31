@@ -51,6 +51,8 @@ app.use(express.json());    // Parse JSON
 app.use(cookieParser());    // Parse cookies
 
 // Configure Session
+const isProdEnv = process.env.NODE_ENV === 'production' || process.env.CLIENT_URL?.includes('vercel.app');
+
 app.use(session({           
     secret: process.env.SESSION_SECRET || 'ridivo_session_secret',      
     resave: false,      
@@ -58,8 +60,8 @@ app.use(session({
     store: sessionStore,        
     cookie: {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: isProdEnv,
+        sameSite: isProdEnv ? 'none' : 'lax',
         maxAge: 30 * 24 * 60 * 60 * 1000
     }
 }));
