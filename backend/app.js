@@ -28,8 +28,20 @@ const app = express();
 app.use(securityHeaders);
 
 // Configure CORS
+const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000'].filter(Boolean);
+
 app.use(cors({ 
-    origin: process.env.CLIENT_URL,     // Allowed client requests
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        // Allow any Vercel deployment URL or localhost or custom CLIENT_URL
+        const isVercel = /\.vercel\.app$/.test(origin);
+        const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+        if (allowedOrigins.includes(origin) || isVercel || isLocal) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true     // Allow cookies
 }));
 app.use(express.json());    // Parse JSON

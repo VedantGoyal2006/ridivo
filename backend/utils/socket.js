@@ -5,9 +5,19 @@ let io;
 const userSockets = new Map();
 
 export const initSocket = (server) => {
+    const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000'].filter(Boolean);
     io = new Server(server, {
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:5173",
+            origin: (origin, callback) => {
+                if (!origin) return callback(null, true);
+                const isVercel = /\.vercel\.app$/.test(origin);
+                const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+                if (allowedOrigins.includes(origin) || isVercel || isLocal) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
             methods: ["GET", "POST", "PUT", "DELETE"],
             credentials: true
         }
