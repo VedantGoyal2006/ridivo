@@ -1,10 +1,24 @@
 import pool from './db.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const runMigrations = async () => {
     const client = await pool.connect();
     try {
         console.log('Running database migrations...');
         await client.query('BEGIN');
+
+        // 0. Initialize core tables from init.sql if they don't exist
+        const sqlPath = path.join(__dirname, 'init.sql');
+        if (fs.existsSync(sqlPath)) {
+            console.log('Applying init.sql schema...');
+            const sql = fs.readFileSync(sqlPath, 'utf8');
+            await client.query(sql);
+        }
 
         // 1. Fix the sessions table if it's incorrect or missing columns
         // Since we are moving to standard schema, let's drop the table if it doesn't match
