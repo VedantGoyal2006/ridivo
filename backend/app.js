@@ -24,6 +24,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy for secure cookies (Render uses a load balancer/reverse proxy)
+app.set('trust proxy', 1);
+
 // Apply custom security headers
 app.use(securityHeaders);
 
