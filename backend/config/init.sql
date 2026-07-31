@@ -1,4 +1,4 @@
--- Enable UUID generation
+-- Enable UUID generation extension
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 1. USERS
@@ -49,7 +49,18 @@ CREATE TABLE IF NOT EXISTS vehicles (
     created_at          TIMESTAMP DEFAULT NOW()
 );
 
--- 4. RIDES
+-- 4. EMERGENCY CONTACTS
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            VARCHAR(100) NOT NULL,
+    relationship    VARCHAR(50) NOT NULL,
+    phone           VARCHAR(15) NOT NULL,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    updated_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 5. RIDES
 CREATE TABLE IF NOT EXISTS rides (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     driver_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -64,16 +75,16 @@ CREATE TABLE IF NOT EXISTS rides (
     estimated_duration  INT,
     total_seats         INT NOT NULL CHECK (total_seats > 0),
     available_seats     INT NOT NULL CHECK (available_seats >= 0),
-    total_trip_cost     DECIMAL(10,2) NOT NULL,
-    price_per_seat      DECIMAL(10,2) NOT NULL CHECK (price_per_seat > 0),
+    total_trip_cost     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    price_per_seat      DECIMAL(10,2) NOT NULL CHECK (price_per_seat >= 0),
     description         TEXT,
-    status              VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'FULL', 'ONGOING', 'COMPLETED', 'CANCELLED')),
+    status              VARCHAR(20) DEFAULT 'PUBLISHED' CHECK (status IN ('PUBLISHED', 'ACTIVE', 'FULL', 'ONGOING', 'COMPLETED', 'CANCELLED')),
     created_at          TIMESTAMP DEFAULT NOW(),
     updated_at          TIMESTAMP DEFAULT NOW(),
     CONSTRAINT available_not_exceed_total CHECK (available_seats <= total_seats)
 );
 
--- 5. RIDE WAYPOINTS
+-- 6. RIDE WAYPOINTS
 CREATE TABLE IF NOT EXISTS ride_waypoints (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ride_id         UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
@@ -84,7 +95,7 @@ CREATE TABLE IF NOT EXISTS ride_waypoints (
     CONSTRAINT unique_stop_order UNIQUE (ride_id, stop_order)
 );
 
--- 6. BOOKINGS
+-- 7. BOOKINGS
 CREATE TABLE IF NOT EXISTS bookings (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ride_id             UUID NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
@@ -93,14 +104,17 @@ CREATE TABLE IF NOT EXISTS bookings (
     pickup_point        VARCHAR(255),
     drop_point          VARCHAR(255),
     total_fare          DECIMAL(10,2) NOT NULL,
-    status              VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'COMPLETED')),
+    status              VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'RESERVED', 'PAID', 'STARTED', 'COMPLETED', 'REJECTED', 'CANCELLED')),
     cancelled_by        VARCHAR(20) CHECK (cancelled_by IN ('DRIVER', 'TRAVELER', 'SYSTEM')),
     cancellation_reason TEXT,
+    otp_hash            VARCHAR(255),
+    otp_expires_at      TIMESTAMP,
+    sos_active          BOOLEAN DEFAULT FALSE,
     created_at          TIMESTAMP DEFAULT NOW(),
     updated_at          TIMESTAMP DEFAULT NOW()
 );
 
--- 7. PAYMENTS
+-- 8. PAYMENTS
 CREATE TABLE IF NOT EXISTS payments (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     booking_id              UUID NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
@@ -116,7 +130,7 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at              TIMESTAMP DEFAULT NOW()
 );
 
--- 8. REFUNDS
+-- 9. REFUNDS
 CREATE TABLE IF NOT EXISTS refunds (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     payment_id          UUID NOT NULL UNIQUE REFERENCES payments(id) ON DELETE CASCADE,
@@ -128,7 +142,7 @@ CREATE TABLE IF NOT EXISTS refunds (
     created_at          TIMESTAMP DEFAULT NOW()
 );
 
--- 9. NOTIFICATIONS
+-- 10. NOTIFICATIONS
 CREATE TABLE IF NOT EXISTS notifications (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -140,7 +154,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
--- 10. REVIEWS
+-- 11. REVIEWS
 CREATE TABLE IF NOT EXISTS reviews (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     booking_id      UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -153,35 +167,27 @@ CREATE TABLE IF NOT EXISTS reviews (
     CONSTRAINT unique_review UNIQUE (booking_id, reviewer_id)
 );
 
--- 11. SESSIONS
+-- 12. SESSIONS
 CREATE TABLE IF NOT EXISTS sessions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    refresh_token   VARCHAR(500) NOT NULL UNIQUE,
-    device_info     VARCHAR(255),
-    ip_address      VARCHAR(50),
-    expires_at      TIMESTAMP NOT NULL,
-    created_at      TIMESTAMP DEFAULT NOW()
+    refresh_token   VARCHAR(255) NOT NULL UNIQUE,
+    expires_at      TIMESTAMP NOT NULL
 );
 
-
-
-
-ALTER TABLE rides
-ADD COLUMN total_trip_cost DECIMAL(10,2) NOT NULL DEFAULT 0;
-
-
-
--- 1. Enable pgcrypto extension for UUID generation (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
--- 2. Create the emergency_contacts table
-CREATE TABLE IF NOT EXISTS emergency_contacts (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name            VARCHAR(100) NOT NULL,
-    relationship    VARCHAR(50) NOT NULL,
-    phone           VARCHAR(15) NOT NULL,
-    created_at      TIMESTAMP DEFAULT NOW(),
-    updated_at      TIMESTAMP DEFAULT NOW()
-);
+-- ── INDEXES FOR MAX PERFORMANCE ──
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin);
+CREATE INDEX IF NOT EXISTS idx_driver_verifications_user ON driver_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_driver_verifications_status ON driver_verifications(status);
+CREATE INDEX IF NOT EXISTS idx_vehicles_driver ON vehicles(driver_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token);
+CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id);
+CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
+CREATE INDEX IF NOT EXISTS idx_rides_departure_time ON rides(departure_time);
+CREATE INDEX IF NOT EXISTS idx_rides_origin_dest ON rides(origin, destination);
+CREATE INDEX IF NOT EXISTS idx_bookings_traveler ON bookings(traveler_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_ride ON bookings(ride_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_payments_booking ON payments(booking_id);
+CREATE INDEX IF NOT EXISTS idx_refunds_booking ON refunds(booking_id);

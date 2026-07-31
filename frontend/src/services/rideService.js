@@ -7,10 +7,12 @@ export const createRide = async (rideData) => {
 };
 
 // Search rides
-export const searchRides = async (origin, destination, date, seats) => {
-    const response = await axiosInstance.get(
-        `/rides/search?origin=${origin}&destination=${destination}&date=${date}&seats=${seats}`
-    );
+export const searchRides = async (origin, destination, date, seats, coords = null) => {
+    let url = `/rides/search?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&date=${date}&seats=${seats}`;
+    if (coords && coords.origin_lat) {
+        url += `&origin_lat=${coords.origin_lat}&origin_lng=${coords.origin_lng}&destination_lat=${coords.destination_lat}&destination_lng=${coords.destination_lng}`;
+    }
+    const response = await axiosInstance.get(url);
     return response.data;
 };
 

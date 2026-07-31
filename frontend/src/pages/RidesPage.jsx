@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -7,58 +7,43 @@ import {
     getMyRides,
     createBooking,
     getBookingsForRide,
-    getMyBookings,
     completeRide,
-    cancelRide
+    cancelRide,
+    acceptBooking,
+    rejectBooking
 } from '../services/rideService';
+import { searchPlaces, calculateRouteOSRM, reverseGeocode } from '../services/geocodeService';
 import axiosInstance from '../utils/axiosInstance';
+import Map from '../components/Map';
+import { Button } from '../components/Button';
+import { Input } from '../components/Input';
+import { Skeleton, CardSkeleton } from '../components/Skeleton';
+import { toast } from 'react-hot-toast';
 import {
-  Search,
-  PlusCircle,
-  Car,
-  Calendar,
-  Users,
-  IndianRupee,
-  MapPin,
-  Flag,
-  Clock,
-  Sparkles,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Info,
-  ClipboardList,
-  Star,
-  ChevronDown,
-  ChevronUp,
+    Search,
+    PlusCircle,
+    Car,
+    Calendar,
+    Users,
+    IndianRupee,
+    MapPin,
+    Clock,
+    Sparkles,
+    CheckCircle,
+    XCircle,
+    AlertTriangle,
+    Info,
+    ClipboardList,
+    Star,
+    ChevronDown,
+    ChevronUp,
+    Navigation,
+    Route,
+    ArrowRight,
+    Map as MapIcon,
+    Trash2,
+    DollarSign
 } from "lucide-react";
-
-const theme = {
-    bgCard: '#FFFFFF',
-    border: '#E2E8F0',
-    textPrimary: '#093C5D',
-    textSecondary: '#6B7280',
-    accent: '#3B7597',
-    accentDark: '#093C5D',
-    accentLight: '#EFF6FF',
-    success: '#10B981',
-    successBg: '#EFFDF4',
-    warning: '#F59E0B',
-    warningBg: '#FEF3C7',
-    danger: '#EF4444',
-    dangerBg: '#FEE2E2',
-};
-
-const badgeStyle = (status) => {
-    const map = {
-        ACTIVE: { bg: theme.successBg, color: theme.success },
-        FULL: { bg: theme.dangerBg, color: theme.danger },
-        CANCELLED: { bg: '#F3F4F6', color: theme.textSecondary },
-        COMPLETED: { bg: theme.accentLight, color: theme.accentDark },
-        ONGOING: { bg: theme.warningBg, color: theme.warning },
-    };
-    return map[status] || { bg: '#F3F4F6', color: theme.textSecondary };
-};
 
 export default function RidesPage() {
     const { user } = useAuth();
@@ -67,79 +52,78 @@ export default function RidesPage() {
     const params = new URLSearchParams(location.search);
     const defaultTab = params.get('tab') || 'search';
     
-    // Parse query params for search redirection from Dashboard
-    const initialOrigin = params.get('origin') || '';
-    const initialDestination = params.get('destination') || '';
-
     const [activeTab, setActiveTab] = useState(defaultTab);
+
+    // ── SEARCH STATE ──
     const [searchForm, setSearchForm] = useState({
-        origin: initialOrigin, destination: initialDestination, date: '', seats: 1
+        origin: '',
+        destination: '',
+        date: '',
+        seats: 1,
+        origin_lat: null,
+        origin_lng: null,
+        destination_lat: null,
+        destination_lng: null
     });
+    
+    const [searchSuggestions, setSearchSuggestions] = useState({ origin: [], destination: [] });
+    const [activeSuggestionField, setActiveSuggestionField] = useState(null); // 'origin' | 'destination'
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
+    const [selectedSearchRide, setSelectedSearchRide] = useState(null); // Selected ride to display route on map
+    const [searchRouteCoords, setSearchRouteCoords] = useState(null);
 
+    // ── PUBLISH (POST) STATE ──
     const [postForm, setPostForm] = useState({
-        vehicle_id: '', origin: '', destination: '',
-        departure_time: '', total_seats: '',
-        total_trip_cost: '', description: '',
-        waypoints: []
+        vehicle_id: '',
+        origin: '',
+        destination: '',
+        origin_lat: null,
+        origin_lng: null,
+        destination_lat: null,
+        destination_lng: null,
+        departure_time: '',
+        total_seats: '',
+        total_trip_cost: '',
+        description: '',
+        waypoints: [] // array of { location_name, lat, lng }
     });
-    const [posting, setPosting] = useState(false);
 
-    const [myRides, setMyRides] = useState([]);
-    const [myVehicles, setMyVehicles] = useState([]);
-    const [myBookings, setMyBookings] = useState([]);
-    const [expandedRides, setExpandedRides] = useState({});
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [rideBookings, setRideBookings] = useState({});
-    const [loadingBookings, setLoadingBookings] = useState({});
+    const [postSuggestions, setPostSuggestions] = useState({ origin: [], destination: [], waypoints: {} });
+    const [activePostSuggestionField, setActivePostSuggestionField] = useState(null); // 'origin' | 'destination' | waypointIndex
+    const [posting, setPosting] = useState(false);
+    const [postRouteInfo, setPostRouteInfo] = useState(null); // { polyline, distance, duration }
     const [aiLoading, setAiLoading] = useState(false);
 
-    const toggleRideExpand = (rideId) => {
-        setExpandedRides(prev => ({
-            ...prev,
-            [rideId]: !prev[rideId]
-        }));
-    };
+    // ── MY TABS STATE ──
+    const [myRides, setMyRides] = useState([]);
+    const [myVehicles, setMyVehicles] = useState([]);
+    const [expandedRides, setExpandedRides] = useState({});
+    const [rideBookings, setRideBookings] = useState({});
+    const [loadingBookings, setLoadingBookings] = useState({});
 
-    const handleCompleteRide = async (rideId) => {
-        if (!window.confirm('Are you sure you want to mark this ride as completed?')) return;
+    // Autocomplete input debounces
+    const debounceTimeout = useRef(null);
+
+    // ── MAP CLICK INTERACTIVE SELECTION STATE ──
+    const [clickedCoords, setClickedCoords] = useState(null);
+    const [clickedAddress, setClickedAddress] = useState("");
+    const [loadingAddress, setLoadingAddress] = useState(false);
+
+    const handleMapClickSelection = async (coords) => {
+        setClickedCoords(coords);
+        setLoadingAddress(true);
+        setClickedAddress("");
         try {
-            setError('');
-            setSuccess('');
-            await completeRide(rideId);
-            setSuccess('Ride marked as completed successfully!');
-            await fetchMyRides();
+            const addr = await reverseGeocode(coords.lat, coords.lng);
+            setClickedAddress(addr);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to complete ride');
+            setClickedAddress(`${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`);
+        } finally {
+            setLoadingAddress(false);
         }
     };
 
-    const handleCancelRide = async (rideId) => {
-        if (!window.confirm('Are you sure you want to cancel this ride? Co-travelers will be notified.')) return;
-        try {
-            setError('');
-            setSuccess('');
-            await cancelRide(rideId);
-            setSuccess('Ride cancelled successfully!');
-            await fetchMyRides();
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to cancel ride');
-        }
-    };
-
-    const fetchMyBookings = async () => {
-        try {
-            const data = await getMyBookings();
-            setMyBookings(data.bookings || []);
-        } catch (err) {
-            console.error('Failed to fetch traveler bookings:', err);
-        }
-    };
-    const [aiSuggestion, setAiSuggestion] = useState(null);
-
-    // Sync tab with URL search parameter changes
     useEffect(() => {
         const tab = params.get('tab') || 'search';
         setActiveTab(tab);
@@ -149,50 +133,27 @@ export default function RidesPage() {
         if (user) {
             fetchMyRides();
             fetchMyVehicles();
-            fetchMyBookings();
         }
     }, [user]);
-
-    // Perform auto search if redirect params are present
-    useEffect(() => {
-        if (initialOrigin && initialDestination) {
-            autoSearch();
-        }
-    }, [initialOrigin, initialDestination]);
-
-    const autoSearch = async () => {
-        setSearching(true);
-        setError('');
-        try {
-            const data = await searchRides(initialOrigin, initialDestination, '', 1);
-            setSearchResults(data.rides);
-            if (data.rides.length === 0) {
-                setError('No rides found for this route');
-            }
-        } catch (err) {
-            setError('Failed to search rides');
-        }
-        setSearching(false);
-    };
 
     const fetchMyRides = async () => {
         try {
             const data = await getMyRides();
-            setMyRides(data.rides);
-            data.rides.forEach(ride => {
+            setMyRides(data.rides || []);
+            data.rides?.forEach(ride => {
                 fetchRideBookings(ride.id);
             });
         } catch (err) {
-            console.error('Failed to fetch rides');
+            console.error('Failed to fetch rides:', err);
         }
     };
 
     const fetchMyVehicles = async () => {
         try {
             const response = await axiosInstance.get('/vehicles');
-            setMyVehicles(response.data.vehicles);
+            setMyVehicles(response.data.vehicles || []);
         } catch (err) {
-            console.error('Failed to fetch vehicles');
+            console.error('Failed to fetch vehicles:', err);
         }
     };
 
@@ -200,799 +161,1069 @@ export default function RidesPage() {
         setLoadingBookings(prev => ({ ...prev, [rideId]: true }));
         try {
             const data = await getBookingsForRide(rideId);
-            setRideBookings(prev => ({ ...prev, [rideId]: data.bookings }));
+            setRideBookings(prev => ({ ...prev, [rideId]: data.bookings || [] }));
         } catch (err) {
-            console.error('Failed to fetch ride bookings');
+            console.error('Failed to fetch ride bookings:', err);
+        } finally {
+            setLoadingBookings(prev => ({ ...prev, [rideId]: false }));
         }
-        setLoadingBookings(prev => ({ ...prev, [rideId]: false }));
     };
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        setError('');
+    const toggleRideExpand = (rideId) => {
+        setExpandedRides(prev => ({
+            ...prev,
+            [rideId]: !prev[rideId]
+        }));
+    };
+
+    // ── SEARCH INTERACTIVE AUTOCOMPLETE ──
+    const handleSearchFieldChange = (e, field) => {
+        const val = e.target.value;
+        setSearchForm(prev => ({ ...prev, [field]: val }));
+        
+        if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+        if (val.length < 3) {
+            setSearchSuggestions(prev => ({ ...prev, [field]: [] }));
+            return;
+        }
+
+        debounceTimeout.current = setTimeout(async () => {
+            const places = await searchPlaces(val);
+            setSearchSuggestions(prev => ({ ...prev, [field]: places }));
+            setActiveSuggestionField(field);
+        }, 400);
+    };
+
+    const selectSearchSuggestion = (place, field) => {
+        setSearchForm(prev => ({
+            ...prev,
+            [field]: place.name.split(',')[0],
+            [`${field}_lat`]: place.lat,
+            [`${field}_lng`]: place.lng
+        }));
+        setSearchSuggestions(prev => ({ ...prev, [field]: [] }));
+        setActiveSuggestionField(null);
+    };
+
+    // ── RIDE MATCHING SEARCH ──
+    const handleSearchSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!searchForm.origin || !searchForm.destination) {
+            return toast.error("Please insert travel locations.");
+        }
+
         setSearching(true);
-        setSearchResults([]);
+        setSelectedSearchRide(null);
+        setSearchRouteCoords(null);
         try {
+            const coords = searchForm.origin_lat ? {
+                origin_lat: searchForm.origin_lat,
+                origin_lng: searchForm.origin_lng,
+                destination_lat: searchForm.destination_lat,
+                destination_lng: searchForm.destination_lng
+            } : null;
+
             const data = await searchRides(
                 searchForm.origin,
                 searchForm.destination,
                 searchForm.date,
-                searchForm.seats
+                searchForm.seats,
+                coords
             );
-            setSearchResults(data.rides);
-            if (data.rides.length === 0) {
-                setError('No rides found for this route');
+            
+            setSearchResults(data.rides || []);
+            if (data.rides?.length === 0) {
+                toast.error('No compatible ride routes found for this search.');
+            } else {
+                toast.success(`Found ${data.rides?.length} matching rides!`);
             }
         } catch (err) {
-            setError('Failed to search rides');
+            toast.error('Failed to search matching rides.');
+        } finally {
+            setSearching(false);
         }
-        setSearching(false);
     };
 
-    const handlePostRide = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setPosting(true);
-        try {
-            const rideData = { ...postForm };
-            const response = await createRide(rideData);
+    // ── SELECT SEARCH CARD ──
+    const handleSelectSearchRide = async (ride) => {
+        setSelectedSearchRide(ride);
+        
+        // Compile coordinates route path
+        const coords = [
+            { lat: parseFloat(ride.origin_lat), lng: parseFloat(ride.origin_lng) },
+            ...(ride.waypoints || []).map(wp => ({ lat: parseFloat(wp.lat), lng: parseFloat(wp.lng) })),
+            { lat: parseFloat(ride.destination_lat), lng: parseFloat(ride.destination_lng) }
+        ];
 
-            if (postForm.waypoints && postForm.waypoints.length > 0) {
-                const validWaypoints = postForm.waypoints.filter(wp => wp.location_name.trim() !== '');
-                if (validWaypoints.length > 0) {
-                    await axiosInstance.post(`/rides/${response.ride.id}/waypoints`, {
-                        waypoints: validWaypoints
-                    });
-                }
-            }
-
-            setSuccess('Ride posted successfully!');
-            setPostForm({
-                vehicle_id: '', origin: '', destination: '',
-                departure_time: '', total_seats: '',
-                total_trip_cost: '', description: '',
-                waypoints: []
-            });
-            await fetchMyRides();
-            navigate('/rides?tab=my');
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to post ride');
+        const routeData = await calculateRouteOSRM(coords);
+        if (routeData) {
+            setSearchRouteCoords(routeData.polyline);
         }
-        setPosting(false);
     };
 
+    // ── SEND BOOKING REQUEST ──
     const handleBookRide = async (rideId) => {
         try {
-            setError('');
             await createBooking({
                 ride_id: rideId,
                 seats_booked: parseInt(searchForm.seats || 1)
             });
-            setSuccess('Booking request sent successfully!');
-            fetchMyBookings();
+            toast.success('Your booking request has been sent to the ride creator!');
+            // Refresh dashboard lists
+            fetchMyRides();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to book ride');
+            toast.error(err.response?.data?.message || 'Failed to submit booking request.');
         }
+    };
+
+    // ── PUBLISH RIDE AUTOCOMPLETE ──
+    const handlePostFieldChange = (e, field) => {
+        const val = e.target.value;
+        setPostForm(prev => ({ ...prev, [field]: val }));
+
+        if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+        if (val.length < 3) {
+            setPostSuggestions(prev => ({ ...prev, [field]: [] }));
+            return;
+        }
+
+        debounceTimeout.current = setTimeout(async () => {
+            const places = await searchPlaces(val);
+            setPostSuggestions(prev => ({ ...prev, [field]: places }));
+            setActivePostSuggestionField(field);
+        }, 400);
+    };
+
+    const selectPostSuggestion = async (place, field) => {
+        const updatedForm = {
+            ...postForm,
+            [field]: place.name.split(',')[0],
+            [`${field}_lat`]: place.lat,
+            [`${field}_lng`]: place.lng
+        };
+        setPostForm(updatedForm);
+        setPostSuggestions(prev => ({ ...prev, [field]: [] }));
+        setActivePostSuggestionField(null);
+
+        // Recompute route if both origin and destination coordinates are selected
+        triggerRouteRecalculation(updatedForm);
+    };
+
+    // Waypoints autocompletes
+    const handleWaypointFieldChange = (e, index) => {
+        const val = e.target.value;
+        const newWaypoints = [...postForm.waypoints];
+        newWaypoints[index].location_name = val;
+        setPostForm(prev => ({ ...prev, waypoints: newWaypoints }));
+
+        if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+
+        if (val.length < 3) {
+            setPostSuggestions(prev => {
+                const wps = { ...prev.waypoints };
+                delete wps[index];
+                return { ...prev, waypoints: wps };
+            });
+            return;
+        }
+
+        debounceTimeout.current = setTimeout(async () => {
+            const places = await searchPlaces(val);
+            setPostSuggestions(prev => ({
+                ...prev,
+                waypoints: { ...prev.waypoints, [index]: places }
+            }));
+            setActivePostSuggestionField(index);
+        }, 400);
+    };
+
+    const selectWaypointSuggestion = (place, index) => {
+        const newWaypoints = [...postForm.waypoints];
+        newWaypoints[index] = {
+            location_name: place.name.split(',')[0],
+            lat: place.lat,
+            lng: place.lng
+        };
+        const updatedForm = { ...postForm, waypoints: newWaypoints };
+        setPostForm(updatedForm);
+        
+        setPostSuggestions(prev => {
+            const wps = { ...prev.waypoints };
+            delete wps[index];
+            return { ...prev, waypoints: wps };
+        });
+        setActivePostSuggestionField(null);
+
+        triggerRouteRecalculation(updatedForm);
     };
 
     const addWaypoint = () => {
-        setPostForm({
-            ...postForm,
-            waypoints: [...postForm.waypoints, { location_name: '', lat: null, lng: null }]
-        });
+        setPostForm(prev => ({
+            ...prev,
+            waypoints: [...prev.waypoints, { location_name: '', lat: null, lng: null }]
+        }));
     };
 
     const removeWaypoint = (index) => {
-        setPostForm({
-            ...postForm,
-            waypoints: postForm.waypoints.filter((_, i) => i !== index)
-        });
+        const updatedWps = postForm.waypoints.filter((_, i) => i !== index);
+        const updatedForm = { ...postForm, waypoints: updatedWps };
+        setPostForm(updatedForm);
+        triggerRouteRecalculation(updatedForm);
     };
 
-    const updateWaypoint = (index, value) => {
-        const newWaypoints = [...postForm.waypoints];
-        newWaypoints[index].location_name = value;
-        setPostForm({ ...postForm, waypoints: newWaypoints });
+    const triggerRouteRecalculation = async (formState) => {
+        if (!formState.origin_lat || !formState.destination_lat) return;
+
+        const coords = [
+            { lat: formState.origin_lat, lng: formState.origin_lng },
+            ...formState.waypoints.filter(wp => wp.lat && wp.lng).map(wp => ({ lat: wp.lat, lng: wp.lng })),
+            { lat: formState.destination_lat, lng: formState.destination_lng }
+        ];
+
+        const routeData = await calculateRouteOSRM(coords);
+        if (routeData) {
+            setPostRouteInfo(routeData);
+        }
     };
 
+    // ── AI COST SHARE ESTIMATOR ──
     const handleAISuggest = async () => {
+        if (!postForm.origin || !postForm.destination) {
+            return toast.error("Please input travel locations first.");
+        }
+
         setAiLoading(true);
-        setAiSuggestion(null);
         try {
-            const response = await axiosInstance.post('/ai/suggest-price', {
+            // Call the AI suggest-price route
+            const res = await axiosInstance.post('/ai/suggest-price', {
                 origin: postForm.origin,
                 destination: postForm.destination
             });
-            setAiSuggestion(response.data);
+
+            // Suggested raw price sharing
+            if (res.data && res.data.raw_total) {
+                const totalEstimatedCost = res.data.raw_total;
+                setPostForm(prev => ({ ...prev, total_trip_cost: totalEstimatedCost }));
+                toast.success(`AI suggested total: ₹${res.data.suggested_total}. Details filled!`);
+            }
         } catch (err) {
-            setError('AI suggestion failed. Please enter price manually.');
-            console.error('AI error:', err);
+            toast.error("AI Price Calculator is offline. Using standard fallback estimate.");
+            // Manual fallback cost estimator (₹7 per km for petrol cost share + mock ₹150 toll)
+            if (postRouteInfo) {
+                const fallbackCost = Math.round(postRouteInfo.distance * 7 + 150);
+                setPostForm(prev => ({ ...prev, total_trip_cost: fallbackCost }));
+            }
+        } finally {
+            setAiLoading(false);
         }
-        setAiLoading(false);
     };
 
-    const inputStyle = {
-        width: '100%',
-        padding: '11px 14px',
-        border: `1.5px solid ${theme.border}`,
-        borderRadius: '10px',
-        fontSize: '14px',
-        fontFamily: "'DM Sans', sans-serif",
-        outline: 'none',
-        color: theme.textPrimary,
-        backgroundColor: '#F9FAFB',
-        boxSizing: 'border-box',
-        transition: 'all 0.2s ease',
+    // ── SUBMIT PUBLISH RIDE ──
+    const handlePostRide = async (e) => {
+        e.preventDefault();
+        if (!postForm.vehicle_id) return toast.error("Please register and select an active vehicle first.");
+        if (!postForm.origin_lat || !postForm.destination_lat) return toast.error("Please pick valid map location points.");
+
+        setPosting(true);
+        try {
+            const rideResponse = await createRide({
+                vehicle_id: postForm.vehicle_id,
+                origin: postForm.origin,
+                destination: postForm.destination,
+                origin_lat: postForm.origin_lat,
+                origin_lng: postForm.origin_lng,
+                destination_lat: postForm.destination_lat,
+                destination_lng: postForm.destination_lng,
+                departure_time: postForm.departure_time,
+                total_seats: postForm.total_seats,
+                total_trip_cost: postForm.total_trip_cost,
+                description: postForm.description
+            });
+
+            const validWps = postForm.waypoints.filter(wp => wp.lat && wp.lng);
+            if (validWps.length > 0) {
+                await axiosInstance.post(`/rides/${rideResponse.ride.id}/waypoints`, {
+                    waypoints: validWps
+                });
+            }
+
+            toast.success("Your ride has been successfully published!");
+            setPostForm({
+                vehicle_id: '', origin: '', destination: '',
+                origin_lat: null, origin_lng: null, destination_lat: null, destination_lng: null,
+                departure_time: '', total_seats: '', total_trip_cost: '', description: '',
+                waypoints: []
+            });
+            setPostRouteInfo(null);
+            fetchMyRides();
+            navigate('/rides?tab=my');
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to publish ride.");
+        } finally {
+            setPosting(false);
+        }
     };
 
-    const labelStyle = {
-        display: 'block',
-        fontSize: '11px',
-        fontWeight: '700',
-        color: theme.textSecondary,
-        marginBottom: '8px',
-        fontFamily: "'DM Sans', sans-serif",
-        textTransform: 'uppercase',
-        letterSpacing: '0.8px',
+    // ── RIDE ACTIONS (COMPLETE/CANCEL) ──
+    const handleCompleteRide = async (rideId) => {
+        if (!window.confirm('Mark this ride as completed?')) return;
+        try {
+            await completeRide(rideId);
+            toast.success('Journey completed successfully! Cost splitter settled.');
+            fetchMyRides();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to complete journey.');
+        }
+    };
+
+    const handleCancelRide = async (rideId) => {
+        if (!window.confirm('Cancel this ride? Passengers will be alerted.')) return;
+        try {
+            await cancelRide(rideId);
+            toast.success('Ride cancelled successfully.');
+            fetchMyRides();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to cancel ride.');
+        }
+    };
+
+    // ── AUDITING RIDE BOOKINGS (ACCEPT/REJECT) ──
+    const handleAcceptRequest = async (bookingId, rideId) => {
+        try {
+            await acceptBooking(bookingId);
+            toast.success('Passenger seat request accepted!');
+            fetchRideBookings(rideId);
+            fetchMyRides();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to accept booking.');
+        }
+    };
+
+    const handleRejectRequest = async (bookingId, rideId) => {
+        try {
+            await rejectBooking(bookingId);
+            toast.success('Seat request rejected.');
+            fetchRideBookings(rideId);
+        } catch (err) {
+            toast.error('Failed to reject booking.');
+        }
     };
 
     return (
-        <>
-            <link href="https://fonts.googleapis.com/css2?family=Sora:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
+            
+            {/* ── HEADER TABS ── */}
+            <div className="flex border-b border-slate-200 gap-6 overflow-x-auto no-scrollbar">
+                {[
+                    { id: 'search', label: 'Search Rides', icon: Search },
+                    { id: 'post', label: 'Offer a Ride', icon: PlusCircle },
+                    { id: 'my', label: 'Offered Trips Queue', icon: Car }
+                ].map(t => {
+                    const Icon = t.icon;
+                    return (
+                        <button
+                            key={t.id}
+                            onClick={() => { setActiveTab(t.id); navigate(`/rides?tab=${t.id}`); }}
+                            className={`flex items-center gap-2 py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap focus:outline-none ${
+                                activeTab === t.id
+                                    ? 'border-primary-600 text-primary-600 font-bold'
+                                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                            }`}
+                        >
+                            <Icon className="w-4 h-4" />
+                            {t.label}
+                        </button>
+                    );
+                })}
+            </div>
 
-            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            {/* ── TABS RENDERING ── */}
+            <div className="space-y-6">
 
-                {/* Hero Header */}
-                <div style={{
-                    background: `linear-gradient(135deg, ${theme.accentDark} 0%, ${theme.accent} 100%)`,
-                    borderRadius: '20px',
-                    padding: '36px 32px',
-                    marginBottom: '28px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 30px rgba(9, 60, 93, 0.05)',
-                }}>
-                    <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(255,255,255,0.1), transparent)', borderRadius: '50%' }} />
-                    
-                    <div style={{ position: 'relative', zIndex: 1, color: "white" }}>
-                        <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: '28px', fontWeight: '800', color: 'white', margin: '0 0 8px' }}>
-                            🚙 Find Your Perfect Ride
-                        </h1>
-                        <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '15px', margin: '0 0 20px', fontFamily: "'DM Sans', sans-serif" }}>
-                            Share rides, split costs fairly, and travel smarter across India.
-                        </p>
-                        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                            {[
-                                { value: '10K+', label: 'Happy Travelers' },
-                                { value: '5K+', label: 'Rides Shared' },
-                                { value: '4.8★', label: 'Avg Rating' },
-                            ].map((stat) => (
-                                <div key={stat.label} style={{ backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '10px 18px', textAlign: 'center' }}>
-                                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: '18px', fontWeight: '800', color: 'white' }}>{stat.value}</div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>{stat.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tab Navigation */}
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', backgroundColor: 'rgba(9,60,93,0.03)', padding: '4px', borderRadius: '12px', border: `1px solid ${theme.border}`, width: 'fit-content' }}>
-                    {[
-                        { id: 'search', label: 'Find a Ride', icon: Search },
-                        { id: 'post', label: 'Offer a Ride', icon: PlusCircle },
-                        { id: 'my', label: 'My Rides', icon: ClipboardList },
-                    ].map((tab) => {
-                        const IconComp = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => { navigate(`/rides?tab=${tab.id}`); setError(''); setSuccess(''); }}
-                                style={{
-                                    padding: '9px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer',
-                                    fontSize: '13.5px', fontWeight: '600', fontFamily: "'DM Sans', sans-serif",
-                                    transition: 'all 0.2s ease',
-                                    backgroundColor: isActive ? theme.bgCard : 'transparent',
-                                    color: isActive ? theme.textPrimary : theme.textSecondary,
-                                    boxShadow: isActive ? `0 4px 10px rgba(9, 60, 93, 0.03)` : 'none',
-                                    display: 'flex', alignItems: 'center', gap: '8px'
-                                }}
-                            >
-                                <IconComp size={14} style={{ color: isActive ? theme.textPrimary : theme.textSecondary }} />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* Status Messages */}
-                {error && (
-                    <div style={{ backgroundColor: theme.dangerBg, border: `1px solid rgba(239,68,68,0.2)`, borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', color: theme.danger, fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: "600" }}>
-                        <AlertTriangle size={16} /> {error}
-                    </div>
-                )}
-                {success && (
-                    <div style={{ backgroundColor: theme.successBg, border: `1px solid rgba(16,185,129,0.2)`, borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', color: theme.success, fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: "600" }}>
-                        <CheckCircle size={16} /> {success}
-                    </div>
-                )}
-
-                {/* ── SEARCH TAB ── */}
+                {/* ── 1. SEARCH RIDES TAB ── */}
                 {activeTab === 'search' && (
-                    <div>
-                        <div style={{ backgroundColor: theme.bgCard, borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(9, 60, 93, 0.01)' }}>
-                            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 20px' }}>Search Available Rides</h2>
-                            <form onSubmit={handleSearch}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                                    <div>
-                                        <label style={labelStyle}>From</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                            <MapPin size={16} style={{ color: theme.textSecondary }} />
-                                            <input placeholder="Departure city (e.g. Indore)" value={searchForm.origin} onChange={(e) => setSearchForm({ ...searchForm, origin: e.target.value })} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>To</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                            <Flag size={16} style={{ color: theme.textSecondary }} />
-                                            <input placeholder="Destination city (e.g. Bhopal)" value={searchForm.destination} onChange={(e) => setSearchForm({ ...searchForm, destination: e.target.value })} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Date</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                            <Calendar size={16} style={{ color: theme.textSecondary }} />
-                                            <input type="date" value={searchForm.date} onChange={(e) => setSearchForm({ ...searchForm, date: e.target.value })} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Seats Needed</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                            <Users size={16} style={{ color: theme.textSecondary }} />
-                                            <input type="number" min="1" value={searchForm.seats} onChange={(e) => setSearchForm({ ...searchForm, seats: e.target.value })} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
-                                        </div>
-                                    </div>
-                                </div>
-                                <button type="submit" disabled={searching} style={{ width: '100%', padding: '13px', backgroundColor: theme.textPrimary, color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: searching ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s ease', boxShadow: '0 4px 12px rgba(9, 60, 93, 0.15)' }}>
-                                    {searching ? 'Searching...' : '🔍 Search Rides'}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Search Results */}
-                        {searchResults.length > 0 && (
-                            <div>
-                                <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 16px' }}>
-                                    {searchResults.length} Ride{searchResults.length > 1 ? 's' : ''} Found
-                                </h2>
-                                {searchResults.map((ride) => (
-                                    <div key={ride.id} style={{ backgroundColor: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '20px 24px', marginBottom: '16px', boxShadow: '0 4px 20px rgba(9,60,93,0.01)', transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)' }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(9, 60, 93, 0.04)'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(9,60,93,0.01)'; }}
-                                    >
-                                        {/* Route header */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                                            <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary }}>{ride.origin}</span>
-                                            <span style={{ color: theme.accent, fontSize: '18px', fontWeight: "700" }}>→</span>
-                                            <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary }}>{ride.destination}</span>
-                                            <span style={{ marginLeft: 'auto', padding: '6px 14px', backgroundColor: theme.accentLight, color: theme.textPrimary, borderRadius: '100px', fontSize: '13px', fontWeight: '700', border: `1px solid rgba(9, 60, 93, 0.08)` }}>
-                                                ₹{ride.price_per_seat}/seat
-                                            </span>
-                                        </div>
-
-                                        {/* Stops Along the Route */}
-                                        {ride.waypoints && ride.waypoints.length > 0 && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', backgroundColor: theme.accentLight, borderRadius: '10px', border: `1px solid rgba(9, 60, 93, 0.04)`, marginBottom: '16px', flexWrap: 'wrap' }}>
-                                                <span style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: '700', textTransform: "uppercase" }}>📍 Route:</span>
-                                                <span style={{ fontSize: '12px', color: theme.textPrimary, fontWeight: "600" }}>{ride.origin}</span>
-                                                {ride.waypoints.map((wp) => (
-                                                    <span key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
-                                                        <span style={{ fontSize: '11px', color: theme.textPrimary, backgroundColor: 'white', padding: '2px 8px', borderRadius: '100px', border: `1px solid ${theme.border}`, fontWeight: "500" }}>
-                                                            {wp.location_name}
-                                                        </span>
-                                                    </span>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        
+                        {/* LEFT FORM & LISTING (7 Columns) */}
+                        <div className="lg:col-span-7 space-y-6">
+                            
+                            {/* Search Form Card */}
+                            <form onSubmit={handleSearchSubmit} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 relative">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    
+                                    {/* Origin Input */}
+                                    <div className="relative">
+                                        <Input
+                                            label="Pickup Origin"
+                                            placeholder="Enter start location..."
+                                            required
+                                            value={searchForm.origin}
+                                            onChange={(e) => handleSearchFieldChange(e, 'origin')}
+                                            icon={MapPin}
+                                        />
+                                        {activeSuggestionField === 'origin' && searchSuggestions.origin.length > 0 && (
+                                            <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-1">
+                                                {searchSuggestions.origin.map((place, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => selectSearchSuggestion(place, 'origin')}
+                                                        className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-slate-50 rounded-xl text-slate-700 truncate"
+                                                    >
+                                                        {place.name}
+                                                    </button>
                                                 ))}
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
-                                                    <span style={{ fontSize: '12px', color: theme.textPrimary, fontWeight: "600" }}>{ride.destination}</span>
-                                                </span>
                                             </div>
                                         )}
+                                    </div>
 
-                                        {/* Details row */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                                            {[
-                                                { icon: Clock, text: new Date(ride.departure_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) },
-                                                { icon: Users, text: `${ride.available_seats} seats available` },
-                                                { icon: Car, text: `${ride.vehicle_name} · ${ride.vehicle_number}` },
-                                            ].map((detail, index) => {
-                                                const IconComp = detail.icon;
-                                                return (
-                                                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#F9FAFB', borderRadius: '10px', padding: '10px 12px', border: `1px solid ${theme.border}` }}>
-                                                        <IconComp size={14} style={{ color: theme.textSecondary }} />
-                                                        <span style={{ fontSize: '12px', color: theme.textSecondary, fontWeight: "600" }}>{detail.text}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {/* Driver details + booking action */}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `1px solid ${theme.border}`, paddingTop: "16px" }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px', color: 'white' }}>
-                                                    {ride.driver_name?.[0]}
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: '13.5px', fontWeight: '700', color: theme.textPrimary }}>{ride.driver_name}</div>
-                                                    <div style={{ fontSize: '11.5px', color: theme.textSecondary, display: "flex", alignItems: "center", gap: "4px" }}>
-                                                        <Star size={11.5} fill="#FCD34D" stroke="#FCD34D" />
-                                                        <span>{ride.avg_rating} · Driver</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {user && ride.driver_id !== user.id && (() => {
-                                                const existingBooking = myBookings.find(b => b.ride_id === ride.id);
-                                                
-                                                let buttonText = "Book Ride";
-                                                let isDisabled = false;
-                                                let buttonStyle = {
-                                                    padding: '10px 20px',
-                                                    backgroundColor: theme.textPrimary,
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '10px',
-                                                    fontSize: '13px',
-                                                    fontWeight: '700',
-                                                    cursor: 'pointer',
-                                                    fontFamily: "'DM Sans', sans-serif",
-                                                    transition: 'all 0.2s ease',
-                                                    boxShadow: "0 4px 10px rgba(9, 60, 93, 0.15)"
-                                                };
-
-                                                if (existingBooking) {
-                                                    isDisabled = true;
-                                                    if (existingBooking.status === 'PENDING') {
-                                                        buttonText = "Request Sent";
-                                                        buttonStyle = {
-                                                            ...buttonStyle,
-                                                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                                                            color: '#10B981',
-                                                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                                                            cursor: 'not-allowed',
-                                                            boxShadow: 'none'
-                                                        };
-                                                    } else if (existingBooking.status === 'ACCEPTED') {
-                                                        buttonText = "Booked";
-                                                        buttonStyle = {
-                                                            ...buttonStyle,
-                                                            backgroundColor: '#10B981',
-                                                            color: 'white',
-                                                            cursor: 'not-allowed',
-                                                            boxShadow: 'none'
-                                                        };
-                                                    } else if (existingBooking.status === 'REJECTED') {
-                                                        buttonText = "Rejected";
-                                                        buttonStyle = {
-                                                            ...buttonStyle,
-                                                            backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                                                            color: '#EF4444',
-                                                            border: '1px solid rgba(239, 68, 68, 0.25)',
-                                                            cursor: 'not-allowed',
-                                                            boxShadow: 'none'
-                                                        };
-                                                    }
-                                                }
-
-                                                return (
-                                                    <button 
-                                                        onClick={() => !isDisabled && handleBookRide(ride.id)} 
-                                                        disabled={isDisabled}
-                                                        style={buttonStyle}
-                                                        onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.backgroundColor = '#07304b'; }}
-                                                        onMouseLeave={(e) => { if (!isDisabled) e.currentTarget.style.backgroundColor = theme.textPrimary; }}
+                                    {/* Destination Input */}
+                                    <div className="relative">
+                                        <Input
+                                            label="Dropoff Destination"
+                                            placeholder="Enter destination..."
+                                            required
+                                            value={searchForm.destination}
+                                            onChange={(e) => handleSearchFieldChange(e, 'destination')}
+                                            icon={Navigation}
+                                        />
+                                        {activeSuggestionField === 'destination' && searchSuggestions.destination.length > 0 && (
+                                            <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-1">
+                                                {searchSuggestions.destination.map((place, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => selectSearchSuggestion(place, 'destination')}
+                                                        className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-slate-50 rounded-xl text-slate-700 truncate"
                                                     >
-                                                        {buttonText}
+                                                        {place.name}
                                                     </button>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ── POST RIDE TAB ── */}
-                {activeTab === 'post' && user && (
-                    <div style={{ backgroundColor: theme.bgCard, borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '28px', boxShadow: '0 4px 20px rgba(9, 60, 93, 0.01)' }}>
-                        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 24px' }}>Offer a Ride</h2>
-
-                        <form onSubmit={handlePostRide}>
-                            {/* Vehicle selection */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={labelStyle}>Select Vehicle</label>
-                                <select value={postForm.vehicle_id} onChange={(e) => setPostForm({ ...postForm, vehicle_id: e.target.value })} required style={inputStyle}>
-                                    <option value="">Choose registered vehicle</option>
-                                    {myVehicles.map((v) => (
-                                        <option key={v.id} value={v.id}>
-                                            {v.vehicle_name} · {v.vehicle_number} ({v.vehicle_type})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Origin & Destination */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                                <div>
-                                    <label style={labelStyle}>From</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                        <MapPin size={16} style={{ color: theme.textSecondary }} />
-                                        <input placeholder="Origin city" value={postForm.origin} onChange={(e) => { setPostForm({ ...postForm, origin: e.target.value }); setAiSuggestion(null); }} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>To</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '0 14px', backgroundColor: '#F9FAFB' }}>
-                                        <Flag size={16} style={{ color: theme.textSecondary }} />
-                                        <input placeholder="Destination city" value={postForm.destination} onChange={(e) => { setPostForm({ ...postForm, destination: e.target.value }); setAiSuggestion(null); }} required style={{ ...inputStyle, border: "none", padding: "12px 0", background: "transparent" }} />
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* AI suggestions */}
-                                <div style={{ gridColumn: 'span 2' }}>
-                                    <button
-                                        type="button"
-                                        onClick={handleAISuggest}
-                                        disabled={!postForm.origin || !postForm.destination || aiLoading}
-                                        style={{
-                                            width: '100%', padding: '11px',
-                                            backgroundColor: aiLoading ? theme.accentLight : 'rgba(9, 60, 93, 0.03)',
-                                            color: theme.textPrimary,
-                                            border: `1px solid ${theme.border}`,
-                                            borderRadius: '10px', fontSize: '13.5px',
-                                            fontWeight: '700', cursor: (!postForm.origin || !postForm.destination) ? 'not-allowed' : 'pointer',
-                                            fontFamily: "'DM Sans', sans-serif",
-                                            transition: 'all 0.2s ease',
-                                            display: 'flex', alignItems: 'center',
-                                            justifyContent: 'center', gap: '8px',
-                                        }}
-                                    >
-                                        <Sparkles size={16} /> {aiLoading ? 'Calculating suggested fare...' : 'AI Price Suggestion'}
-                                    </button>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-end">
+                                    <Input
+                                        label="Travel Date"
+                                        type="date"
+                                        required
+                                        value={searchForm.date}
+                                        onChange={(e) => setSearchForm(prev => ({ ...prev, date: e.target.value }))}
+                                        icon={Calendar}
+                                    />
+                                    <Input
+                                        label="Requested Seats"
+                                        type="number"
+                                        min={1}
+                                        max={7}
+                                        required
+                                        value={searchForm.seats}
+                                        onChange={(e) => setSearchForm(prev => ({ ...prev, seats: e.target.value }))}
+                                        icon={Users}
+                                    />
+                                    <div className="col-span-2 md:col-span-1">
+                                        <Button type="submit" variant="primary" className="w-full" isLoading={searching}>
+                                            Search Match
+                                        </Button>
+                                    </div>
                                 </div>
+                            </form>
 
-                                {aiSuggestion && (
-                                    <div style={{
-                                        gridColumn: 'span 2',
-                                        padding: '20px',
-                                        backgroundColor: theme.accentLight,
-                                        borderRadius: '12px',
-                                        border: `1px solid rgba(9, 60, 93, 0.1)`,
-                                    }}>
-                                        <div style={{ fontSize: '13px', fontWeight: '700', color: theme.textPrimary, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                            <Sparkles size={14} /> AI Price Suggestion
-                                        </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                                            {[
-                                                { label: 'Distance', value: aiSuggestion.distance },
-                                                { label: 'Est. Fuel Cost', value: aiSuggestion.petrol_cost },
-                                                { label: 'Est. Tolls', value: aiSuggestion.toll_cost },
-                                            ].map((item) => (
-                                                <div key={item.label} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '10px', border: `1px solid ${theme.border}` }}>
-                                                    <div style={{ fontSize: '10px', color: theme.textSecondary, fontWeight: "600", textTransform: "uppercase", marginBottom: '4px' }}>{item.label}</div>
-                                                    <div style={{ fontSize: '13px', fontWeight: '700', color: theme.textPrimary }}>{item.value}</div>
+                            {/* Search Results Listing */}
+                            <div className="space-y-4">
+                                {searching ? (
+                                    <>
+                                        <CardSkeleton />
+                                        <CardSkeleton />
+                                    </>
+                                ) : searchResults.length === 0 ? (
+                                    <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+                                        <MapIcon className="w-12 h-12 text-slate-300 mx-auto" />
+                                        <h4 className="text-sm font-bold text-slate-800 mt-4">Search For Intercity Cost Sharing Rides</h4>
+                                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                                            Search by coordinates to get route path overlap matching.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    searchResults.map((ride) => (
+                                        <div
+                                            key={ride.id}
+                                            onClick={() => handleSelectSearchRide(ride)}
+                                            className={`bg-white border rounded-3xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-4 ${
+                                                selectedSearchRide?.id === ride.id ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-200'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex gap-3">
+                                                    {ride.profile_pic ? (
+                                                        <img src={ride.profile_pic} alt={ride.driver_name} className="w-12 h-12 rounded-xl object-cover" />
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-lg">
+                                                            {ride.driver_name[0]}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-800">{ride.driver_name}</h4>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                                                            <span className="text-xs font-bold text-yellow-500">{parseFloat(ride.avg_rating || 0).toFixed(1)}</span>
+                                                            <span className="text-[10px] text-slate-400">· {ride.vehicle_name}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyStyle: "space-between", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-                                            <div>
-                                                <div style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: "600" }}>Suggested Total Trip Cost</div>
-                                                <div style={{ fontSize: '22px', fontWeight: '800', color: theme.textPrimary, fontFamily: "'Sora', sans-serif" }}>
-                                                    {aiSuggestion.suggested_total}
+
+                                                <div className="text-right">
+                                                    <span className="bg-primary-50 text-primary-600 text-xs font-extrabold px-3 py-1 rounded-full">
+                                                        {ride.match_score ? `${ride.match_score}% route match` : 'Route overlap'}
+                                                    </span>
+                                                    <p className="text-xs font-semibold text-slate-400 mt-1">{ride.available_seats} seats left</p>
                                                 </div>
                                             </div>
+
+                                            {/* Route & Times */}
+                                            <div className="space-y-1.5 text-xs text-slate-600">
+                                                <p className="flex items-center gap-1.5 truncate"><MapPin className="w-4 h-4 text-emerald-500 flex-shrink-0" /> <span className="font-bold text-slate-800">Start:</span> {ride.origin}</p>
+                                                {ride.waypoints && ride.waypoints.length > 0 && (
+                                                    <p className="pl-6 text-[11px] text-primary-500 font-bold truncate">➔ Via: {ride.waypoints.map(w => w.location_name).join(', ')}</p>
+                                                )}
+                                                <p className="flex items-center gap-1.5 truncate"><Navigation className="w-4 h-4 text-red-500 flex-shrink-0" /> <span className="font-bold text-slate-800">End:</span> {ride.destination}</p>
+                                                <p className="flex items-center gap-1.5 mt-2"><Clock className="w-4 h-4 text-slate-400" /> <span className="font-bold text-slate-800">Leaves:</span> {new Date(ride.departure_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                                            </div>
+
+                                            {/* Price & Book CTA */}
+                                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                                <div>
+                                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Co-travel Cost Share</span>
+                                                    <div className="flex items-baseline gap-1 mt-0.5">
+                                                        <span className="text-lg font-extrabold text-slate-800">₹{Math.round(ride.price_per_seat)}</span>
+                                                        <span className="text-xs text-slate-400 font-semibold">/ seat</span>
+                                                    </div>
+                                                </div>
+                                                <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); handleBookRide(ride.id); }}>
+                                                    Request Seat
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* RIGHT MAP DISPLAY (5 Columns) */}
+                        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
+                            <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-4 relative overflow-hidden">
+                                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Route className="w-4 h-4 text-primary-600" /> Route Mapping Preview
+                                </h4>
+                                
+                                <Map
+                                    height="520px"
+                                    interactive={true}
+                                    onMapClick={handleMapClickSelection}
+                                    routePolyline={searchRouteCoords}
+                                    markers={selectedSearchRide ? [
+                                        { lat: parseFloat(selectedSearchRide.origin_lat), lng: parseFloat(selectedSearchRide.origin_lng), color: '#10B981', label: 'Origin' },
+                                        ...(selectedSearchRide.waypoints || []).map(wp => ({ lat: parseFloat(wp.lat), lng: parseFloat(wp.lng), color: '#F59E0B', label: wp.location_name })),
+                                        { lat: parseFloat(selectedSearchRide.destination_lat), lng: parseFloat(selectedSearchRide.destination_lng), color: '#EF4444', label: 'Destination' }
+                                    ] : []}
+                                />
+
+                                {/* Click Selection Floating Card */}
+                                {clickedCoords && activeTab === 'search' && (
+                                    <div className="absolute bottom-6 left-6 right-6 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl z-20 space-y-3 animate-fade-in-up">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Selected Point</span>
+                                                <p className="text-xs text-slate-700 font-medium mt-0.5 leading-relaxed">
+                                                    {loadingAddress ? "Reverse geocoding..." : clickedAddress || "Unknown coordinates"}
+                                                </p>
+                                            </div>
+                                            <button type="button" onClick={() => setClickedCoords(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xs">✕</button>
+                                        </div>
+                                        <div className="flex gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => setPostForm({ ...postForm, total_trip_cost: aiSuggestion.raw_total })}
-                                                style={{
-                                                    padding: '10px 20px',
-                                                    backgroundColor: theme.textPrimary,
-                                                    color: 'white', border: 'none',
-                                                    borderRadius: '8px', fontSize: '13px',
-                                                    fontWeight: '700', cursor: 'pointer',
-                                                    fontFamily: "'DM Sans', sans-serif",
+                                                onClick={() => {
+                                                    const cleanAddr = clickedAddress ? clickedAddress.split(',').slice(0, 2).join(',') : `${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`;
+                                                    setSearchForm(prev => ({
+                                                        ...prev,
+                                                        origin: cleanAddr,
+                                                        origin_lat: clickedCoords.lat,
+                                                        origin_lng: clickedCoords.lng
+                                                    }));
+                                                    setClickedCoords(null);
+                                                    toast.success("Departure Origin set!");
                                                 }}
+                                                className="flex-1 bg-primary-600 text-white font-bold py-2 rounded-xl text-[10px] transition-colors hover:bg-primary-700"
+                                                disabled={loadingAddress}
                                             >
-                                                Use Suggestion
+                                                Set Origin
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const cleanAddr = clickedAddress ? clickedAddress.split(',').slice(0, 2).join(',') : `${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`;
+                                                    setSearchForm(prev => ({
+                                                        ...prev,
+                                                        destination: cleanAddr,
+                                                        destination_lat: clickedCoords.lat,
+                                                        destination_lng: clickedCoords.lng
+                                                    }));
+                                                    setClickedCoords(null);
+                                                    toast.success("Dropoff Destination set!");
+                                                }}
+                                                className="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-xl text-[10px] transition-colors hover:bg-emerald-700"
+                                                disabled={loadingAddress}
+                                            >
+                                                Set Destination
                                             </button>
                                         </div>
-                                        <div style={{ marginTop: '12px', fontSize: '12px', color: theme.textSecondary, fontStyle: 'italic', borderTop: `1px solid ${theme.border}`, paddingTop: "10px" }}>
-                                            {aiSuggestion.explanation}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Waypoints / Stops */}
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={labelStyle}>Intermediate Stops (Optional)</label>
-                                <p style={{ fontSize: '12px', color: theme.textSecondary, margin: '0 0 12px', fontFamily: "'DM Sans', sans-serif" }}>
-                                    Add towns or checkposts along your route to let travelers board there.
-                                </p>
-
-                                {(postForm.origin || postForm.waypoints.length > 0 || postForm.destination) && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', backgroundColor: theme.accentLight, borderRadius: '10px', border: `1px solid rgba(9, 60, 93, 0.05)`, marginBottom: '12px', flexWrap: 'wrap' }}>
-                                        {postForm.origin && <span style={{ fontSize: '12px', color: theme.textPrimary, fontWeight: '700' }}>{postForm.origin}</span>}
-                                        {postForm.waypoints.map((wp, i) => (
-                                            wp.location_name && (
-                                                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
-                                                    <span style={{ fontSize: '11px', color: theme.textPrimary, backgroundColor: 'white', padding: '2px 8px', borderRadius: '100px', border: `1px solid ${theme.border}`, fontWeight: "500" }}>{wp.location_name}</span>
-                                                </span>
-                                            )
-                                        ))}
-                                        {postForm.destination && (
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <span style={{ color: theme.textSecondary, fontSize: '10px' }}>→</span>
-                                                <span style={{ fontSize: '12px', color: theme.textPrimary, fontWeight: '700' }}>{postForm.destination}</span>
-                                            </span>
-                                        )}
                                     </div>
                                 )}
 
-                                {postForm.waypoints.map((wp, index) => (
-                                    <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-                                        <span style={{ color: theme.textSecondary, fontSize: '12px', minWidth: '60px', fontWeight: "600" }}>Stop {index + 1}</span>
-                                        <input
-                                            placeholder={`e.g. Dewas`}
-                                            value={wp.location_name}
-                                            onChange={(e) => updateWaypoint(index, e.target.value)}
-                                            style={{ ...inputStyle, flex: 1 }}
-                                        />
-                                        <button type="button" onClick={() => removeWaypoint(index)} style={{ padding: '10px 14px', backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`, borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', flexShrink: 0 }}>
-                                            Remove
-                                        </button>
+                                {selectedSearchRide && (
+                                    <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+                                        <p className="font-bold text-slate-700">Driver route deviation matching details:</p>
+                                        <p className="text-slate-500">· Pickup walking distance: <span className="font-semibold text-slate-800">{selectedSearchRide.pickup_deviation_km || 0} km</span></p>
+                                        <p className="text-slate-500">· Dropoff walking distance: <span className="font-semibold text-slate-800">{selectedSearchRide.dropoff_deviation_km || 0} km</span></p>
                                     </div>
-                                ))}
-
-                                <button type="button" onClick={addWaypoint} style={{ padding: '8px 16px', backgroundColor: theme.accentLight, color: theme.textPrimary, border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: '700', fontFamily: "'DM Sans', sans-serif", marginTop: '4px' }}>
-                                    + Add Intermediate Stop
-                                </button>
+                                )}
                             </div>
-
-                            {/* Departure & Pricing details */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                                <div>
-                                    <label style={labelStyle}>Departure Date & Time</label>
-                                    <input type="datetime-local" value={postForm.departure_time} onChange={(e) => setPostForm({ ...postForm, departure_time: e.target.value })} required style={inputStyle} />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Total Seats Offered</label>
-                                    <input type="number" min="1" max="7" placeholder="e.g. 3" value={postForm.total_seats} onChange={(e) => setPostForm({ ...postForm, total_seats: e.target.value })} required style={inputStyle} />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Total Trip Cost (₹)</label>
-                                    <input type="number" min="1" placeholder="e.g. 600" value={postForm.total_trip_cost} onChange={(e) => setPostForm({ ...postForm, total_trip_cost: e.target.value })} required style={inputStyle} />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Price Per Co-traveler (Calculated)</label>
-                                    <input
-                                        placeholder="Calculated automatically"
-                                        value={postForm.total_trip_cost && postForm.total_seats ? `₹${(postForm.total_trip_cost / (parseInt(postForm.total_seats) + 1)).toFixed(2)}` : ''}
-                                        disabled
-                                        style={{ ...inputStyle, color: theme.success, fontWeight: '700', cursor: 'not-allowed', backgroundColor: '#F3F4F6' }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Description */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={labelStyle}>Description / Notes (Optional)</label>
-                                <textarea placeholder="e.g. No heavy luggage allowed, carrying water, scheduled stop for tea." value={postForm.description} onChange={(e) => setPostForm({ ...postForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
-                            </div>
-
-                            <button type="submit" disabled={posting} style={{ width: '100%', padding: '13px', backgroundColor: theme.textPrimary, color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: posting ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s ease', boxShadow: "0 4px 12px rgba(9, 60, 93, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                                <Car size={16} />
-                                {posting ? 'Posting Ride...' : 'Post Ride Offer'}
-                            </button>
-                        </form>
+                        </div>
                     </div>
                 )}
 
-                {/* ── MY RIDES TAB ── */}
-                {activeTab === 'my' && user && (
-                    <div>
-                        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary, margin: '0 0 16px' }}>My Ride Offers</h2>
-
-                        {myRides.length === 0 ? (
-                            <div style={{ backgroundColor: theme.bgCard, borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '60px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(9, 60, 93, 0.01)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '16px' }}>
-                                    <Car size={48} />
-                                </div>
-                                <p style={{ color: theme.textSecondary, fontSize: '15px', margin: '0 0 20px', fontWeight: "500" }}>You haven't offered any rides yet.</p>
-                                <button onClick={() => navigate('/rides?tab=post')} style={{ padding: '11px 28px', backgroundColor: theme.textPrimary, color: 'white', border: 'none', borderRadius: '10px', fontSize: '13.5px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 12px rgba(9, 60, 93, 0.15)" }}>
-                                    Offer Your First Ride
-                                </button>
+                {/* ── 2. OFFER A RIDE TAB ── */}
+                {activeTab === 'post' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        
+                        {/* LEFT RIDE CREATION FORM (7 Columns) */}
+                        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-800 tracking-tight">Offer seats in your vehicle</h3>
+                                <p className="text-xs text-slate-500 mt-1">Split fuel, tolls, and parking costs fairly. No profits, community cost sharing.</p>
                             </div>
-                        ) : (
-                            myRides.map((ride) => {
-                                const isExpanded = !!expandedRides[ride.id];
-                                return (
-                                    <div key={ride.id} style={{ backgroundColor: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '20px 24px', marginBottom: '16px', boxShadow: '0 4px 20px rgba(9,60,93,0.01)', transition: 'all 0.25s' }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; }}
-                                    >
-                                        {/* Basic details header */}
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isExpanded ? '16px' : '0px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary }}>{ride.origin}</span>
-                                                <span style={{ color: theme.accent, fontSize: '16px', fontWeight: "700" }}>→</span>
-                                                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: '16px', fontWeight: '700', color: theme.textPrimary }}>{ride.destination}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <span style={{ padding: '4px 12px', backgroundColor: badgeStyle(ride.status).bg, color: badgeStyle(ride.status).color, borderRadius: '100px', fontSize: '11px', fontWeight: '700', border: `1px solid rgba(9, 60, 93, 0.08)` }}>
-                                                    {ride.status}
-                                                </span>
-                                                <button 
-                                                    onClick={() => toggleRideExpand(ride.id)}
-                                                    style={{ background: 'none', border: 'none', color: theme.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
-                                                >
-                                                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                                                </button>
-                                            </div>
-                                        </div>
 
-                                        {/* Basic details row (always visible) */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: isExpanded ? '0px' : '12px' }}>
-                                            {[
-                                                { icon: Clock, text: new Date(ride.departure_time).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) },
-                                                { icon: Users, text: `${ride.available_seats}/${ride.total_seats} seats` },
-                                                { icon: IndianRupee, text: `₹${ride.price_per_seat}/seat` },
-                                            ].map((detail, idx) => {
-                                                const IconComp = detail.icon;
-                                                return (
-                                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#F9FAFB', borderRadius: '8px', padding: '10px 12px', border: `1px solid ${theme.border}` }}>
-                                                        <IconComp size={13} style={{ color: theme.textSecondary }} />
-                                                        <span style={{ fontSize: '12px', color: theme.textSecondary, fontWeight: "600" }}>{detail.text}</span>
-                                                    </div>
-                                                );
-                                            })}
+                            <form onSubmit={handlePostRide} className="space-y-4">
+                                {/* Vehicle Selection */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-slate-700">Select Vehicle</label>
+                                    {myVehicles.length === 0 ? (
+                                        <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-2xl text-xs text-yellow-800 font-semibold">
+                                            No verified active vehicles in your garage. Go to Profile ➔ Garage tab to register.
                                         </div>
+                                    ) : (
+                                        <select
+                                            value={postForm.vehicle_id}
+                                            onChange={(e) => setPostForm(prev => ({ ...prev, vehicle_id: e.target.value }))}
+                                            required
+                                            className="block w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                                        >
+                                            <option value="">Select vehicle...</option>
+                                            {myVehicles.map(v => (
+                                                <option key={v.id} value={v.id}>{v.vehicle_name} ({v.vehicle_number})</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
 
-                                        {/* Collapsible expanded section */}
-                                        {isExpanded && (
-                                            <div style={{ marginTop: '16px', borderTop: `1px solid ${theme.border}`, paddingTop: '16px' }}>
-                                                
-                                                {/* Intermediate stops (Waypoints) */}
-                                                {ride.waypoints && ride.waypoints.length > 0 && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', backgroundColor: theme.accentLight, borderRadius: '8px', border: `1px solid rgba(9, 60, 93, 0.05)`, marginBottom: '16px', flexWrap: 'wrap' }}>
-                                                        <span style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: "700" }}>📍 Stops:</span>
-                                                        {ride.waypoints.map((wp) => (
-                                                            <span key={wp.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                <span style={{ color: theme.textSecondary, fontSize: '9px' }}>→</span>
-                                                                <span style={{ fontSize: '11px', color: theme.textPrimary, backgroundColor: 'white', padding: '2px 8px', borderRadius: '100px', border: `1px solid ${theme.border}`, fontWeight: "500" }}>{wp.location_name}</span>
-                                                            </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Origin location */}
+                                    <div className="relative">
+                                        <Input
+                                            label="Trip Origin (Start)"
+                                            placeholder="e.g. Delhi Airport"
+                                            required
+                                            value={postForm.origin}
+                                            onChange={(e) => handlePostFieldChange(e, 'origin')}
+                                            icon={MapPin}
+                                        />
+                                        {activePostSuggestionField === 'origin' && postSuggestions.origin.length > 0 && (
+                                            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-1">
+                                                {postSuggestions.origin.map((place, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => selectPostSuggestion(place, 'origin')}
+                                                        className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-slate-50 rounded-xl text-slate-700 truncate"
+                                                    >
+                                                        {place.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Destination location */}
+                                    <div className="relative">
+                                        <Input
+                                            label="Trip Destination (End)"
+                                            placeholder="e.g. Taj Mahal, Agra"
+                                            required
+                                            value={postForm.destination}
+                                            onChange={(e) => handlePostFieldChange(e, 'destination')}
+                                            icon={Navigation}
+                                        />
+                                        {activePostSuggestionField === 'destination' && postSuggestions.destination.length > 0 && (
+                                            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-1">
+                                                {postSuggestions.destination.map((place, i) => (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={() => selectPostSuggestion(place, 'destination')}
+                                                        className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-slate-50 rounded-xl text-slate-700 truncate"
+                                                    >
+                                                        {place.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Waypoint Locations list */}
+                                <div className="space-y-2.5 pt-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Intermediary Waypoint Stopovers</label>
+                                        <button type="button" onClick={addWaypoint} className="text-xs font-bold text-primary-600 flex items-center gap-1 hover:underline">
+                                            <PlusCircle className="w-4 h-4" /> Add Stop
+                                        </button>
+                                    </div>
+
+                                    {postForm.waypoints.map((wp, index) => (
+                                        <div key={index} className="flex gap-2 items-end relative">
+                                            <div className="flex-1">
+                                                <Input
+                                                    placeholder={`Stop ${index + 1} address...`}
+                                                    value={wp.location_name}
+                                                    onChange={(e) => handleWaypointFieldChange(e, index)}
+                                                    icon={Route}
+                                                />
+                                                {activePostSuggestionField === index && postSuggestions.waypoints[index] && postSuggestions.waypoints[index].length > 0 && (
+                                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 p-1.5 space-y-1">
+                                                        {postSuggestions.waypoints[index].map((place, i) => (
+                                                            <button
+                                                                key={i}
+                                                                type="button"
+                                                                onClick={() => selectWaypointSuggestion(place, index)}
+                                                                className="w-full text-left text-xs font-semibold px-4 py-2.5 hover:bg-slate-50 rounded-xl text-slate-700 truncate"
+                                                            >
+                                                                {place.name}
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 )}
-
-                                                {/* Co-travelers and Requests list */}
-                                                <div style={{ marginBottom: '16px' }}>
-                                                    <div style={{ fontSize: '11.5px', fontWeight: '700', color: theme.textSecondary, letterSpacing: '0.5px', marginBottom: '12px', textTransform: 'uppercase' }}>
-                                                        👥 Confirmed Co-travelers
-                                                    </div>
-                                                    
-                                                    {rideBookings[ride.id] && rideBookings[ride.id].filter(b => b.status === 'CONFIRMED').map((booking) => (
-                                                        <div key={booking.id} style={{
-                                                            display: 'flex', alignItems: 'center',
-                                                            justifyContent: 'space-between',
-                                                            padding: '10px 14px',
-                                                            backgroundColor: theme.successBg,
-                                                            borderRadius: '10px',
-                                                            border: `1px solid rgba(16, 185, 129, 0.15)`,
-                                                            marginBottom: '8px',
-                                                        }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                <div style={{
-                                                                    width: '32px', height: '32px',
-                                                                    borderRadius: '8px',
-                                                                    background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
-                                                                    display: 'flex', alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    fontWeight: '700', fontSize: '13px',
-                                                                    color: 'white',
-                                                                    flexShrink: 0,
-                                                                }}>
-                                                                    {booking.traveler_name?.[0] || 'T'}
-                                                                </div>
-                                                                <div>
-                                                                    <div style={{ fontSize: '13px', fontWeight: '700', color: theme.textPrimary }}>
-                                                                        {booking.traveler_name}
-                                                                    </div>
-                                                                    <div style={{ fontSize: '11px', color: theme.textSecondary, display: "flex", alignItems: "center", gap: "4px" }}>
-                                                                        <Star size={11} fill="#FCD34D" stroke="#FCD34D" />
-                                                                        <span>{booking.traveler_rating} · {booking.seats_booked} seat{booking.seats_booked > 1 ? 's' : ''}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div style={{ textAlign: 'right' }}>
-                                                                <div style={{ fontSize: '13px', fontWeight: '700', color: theme.success }}>
-                                                                    ₹{booking.total_fare}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-
-                                                    {(!rideBookings[ride.id] || rideBookings[ride.id].filter(b => b.status === 'CONFIRMED').length === 0) && (
-                                                        <div style={{ fontSize: '12px', color: theme.textSecondary, padding: '4px 0', fontStyle: "italic", marginBottom: '8px' }}>
-                                                            No confirmed co-travelers yet
-                                                        </div>
-                                                    )}
-
-                                                    {/* Pending booking requests */}
-                                                    {rideBookings[ride.id] && rideBookings[ride.id].filter(b => b.status === 'PENDING').length > 0 && (
-                                                        <div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: theme.warningBg, borderRadius: '8px', border: `1px solid rgba(245, 158, 11, 0.15)`, cursor: 'pointer' }}
-                                                            onClick={() => navigate('/bookings')}>
-                                                            <span style={{ fontSize: '12px', color: theme.warningText, fontWeight: '700', display: "flex", alignItems: "center", gap: "6px" }}>
-                                                                <Clock size={13} /> {rideBookings[ride.id].filter(b => b.status === 'PENDING').length} booking request(s) pending approval →
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {loadingBookings[ride.id] && (
-                                                    <div style={{ marginBottom: '16px', fontSize: '11px', color: theme.textSecondary, textAlign: 'center' }}>
-                                                        Loading details...
-                                                    </div>
-                                                )}
-
-                                                {/* Availability footer bar */}
-                                                <div style={{
-                                                    padding: '10px 14px',
-                                                    backgroundColor: ride.available_seats === 0 ? theme.dangerBg : theme.successBg,
-                                                    borderRadius: '8px',
-                                                    border: `1px solid ${ride.available_seats === 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'}`,
-                                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                                    marginBottom: ride.status === 'ACTIVE' ? '16px' : '0px'
-                                                }}>
-                                                    <span style={{ fontSize: '13px', fontWeight: '700', color: ride.available_seats === 0 ? theme.danger : theme.success }}>
-                                                        {ride.available_seats === 0
-                                                            ? 'Ride is FULL — no remaining seats'
-                                                            : `${ride.available_seats} seat${ride.available_seats > 1 ? 's' : ''} available`
-                                                        }
-                                                    </span>
-                                                </div>
-
-                                                {/* Action Buttons: Complete / Cancel */}
-                                                {ride.status === 'ACTIVE' && (
-                                                    <div style={{ display: 'flex', gap: '10px', marginTop: '16px', borderTop: `1px solid ${theme.border}`, paddingTop: '16px' }}>
-                                                        <button 
-                                                            onClick={() => handleCompleteRide(ride.id)}
-                                                            style={{ flex: 1, padding: '10px 16px', backgroundColor: theme.success, color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
-                                                        >
-                                                            Complete Ride
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleCancelRide(ride.id)}
-                                                            style={{ padding: '10px 16px', backgroundColor: 'transparent', color: theme.danger, border: `1px solid ${theme.danger}`, borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
-                                                        >
-                                                            Cancel Ride
-                                                        </button>
-                                                    </div>
-                                                )}
                                             </div>
-                                        )}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeWaypoint(index)}
+                                                className="p-3 bg-slate-50 border border-slate-200 text-red-500 rounded-xl hover:bg-red-50 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                    <Input
+                                        label="Departure Date & Time"
+                                        type="datetime-local"
+                                        required
+                                        value={postForm.departure_time}
+                                        onChange={(e) => setPostForm(prev => ({ ...prev, departure_time: e.target.value }))}
+                                        icon={Clock}
+                                    />
+                                    <Input
+                                        label="Available Passenger Seats"
+                                        type="number"
+                                        min={1}
+                                        max={7}
+                                        required
+                                        value={postForm.total_seats}
+                                        onChange={(e) => setPostForm(prev => ({ ...prev, total_seats: e.target.value }))}
+                                        icon={Users}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                                    <Input
+                                        label="Estimated Total Cost (Petrol + Tolls)"
+                                        type="number"
+                                        required
+                                        placeholder="e.g. 1500"
+                                        value={postForm.total_trip_cost}
+                                        onChange={(e) => setPostForm(prev => ({ ...prev, total_trip_cost: e.target.value }))}
+                                        icon={IndianRupee}
+                                    />
+                                    <div>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            className="w-full text-primary-600 font-bold border-dashed"
+                                            onClick={handleAISuggest}
+                                            isLoading={aiLoading}
+                                        >
+                                            <Sparkles className="w-4 h-4 text-primary-600" /> AI Cost Estimator
+                                        </Button>
                                     </div>
-                                );
-                            })
+                                </div>
+
+                                <Input
+                                    label="Travel Notes / Message"
+                                    placeholder="e.g., Leaving early, luggage space available, splitting petrol..."
+                                    value={postForm.description || ''}
+                                    onChange={(e) => setPostForm(prev => ({ ...prev, description: e.target.value }))}
+                                    icon={Info}
+                                />
+
+                                <div className="pt-4">
+                                    <Button type="submit" variant="primary" className="w-full" isLoading={posting}>
+                                        Publish Ride Offer
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* RIGHT MAP ROUTE PLOTTING (5 Columns) */}
+                        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4">
+                            <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-4 relative overflow-hidden">
+                                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <MapIcon className="w-4 h-4 text-primary-600" /> Active Trip Polyline Map
+                                </h4>
+
+                                <Map
+                                    height="520px"
+                                    interactive={true}
+                                    onMapClick={handleMapClickSelection}
+                                    routePolyline={postRouteInfo?.polyline}
+                                    markers={[
+                                        ...(postForm.origin_lat ? [{ lat: postForm.origin_lat, lng: postForm.origin_lng, color: '#10B981', label: 'Origin' }] : []),
+                                        ...postForm.waypoints.filter(wp => wp.lat && wp.lng).map(wp => ({ lat: wp.lat, lng: wp.lng, color: '#F59E0B', label: wp.location_name })),
+                                        ...(postForm.destination_lat ? [{ lat: postForm.destination_lat, lng: postForm.destination_lng, color: '#EF4444', label: 'Destination' }] : [])
+                                    ]}
+                                />
+
+                                {/* Click Selection Floating Card */}
+                                {clickedCoords && activeTab === 'post' && (
+                                    <div className="absolute bottom-6 left-6 right-6 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl z-20 space-y-3 animate-fade-in-up">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Selected Point</span>
+                                                <p className="text-xs text-slate-700 font-medium mt-0.5 leading-relaxed">
+                                                    {loadingAddress ? "Reverse geocoding..." : clickedAddress || "Unknown coordinates"}
+                                                </p>
+                                            </div>
+                                            <button type="button" onClick={() => setClickedCoords(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xs">✕</button>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const cleanAddr = clickedAddress ? clickedAddress.split(',').slice(0, 2).join(',') : `${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`;
+                                                    const updated = {
+                                                        ...postForm,
+                                                        origin: cleanAddr,
+                                                        origin_lat: clickedCoords.lat,
+                                                        origin_lng: clickedCoords.lng
+                                                    };
+                                                    setPostForm(updated);
+                                                    triggerRouteRecalculation(updated);
+                                                    setClickedCoords(null);
+                                                    toast.success("Departure Origin set!");
+                                                }}
+                                                className="bg-primary-600 text-white font-bold py-2 rounded-xl text-[9px] text-center transition-colors hover:bg-primary-700"
+                                                disabled={loadingAddress}
+                                            >
+                                                Set Start
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const cleanAddr = clickedAddress ? clickedAddress.split(',').slice(0, 2).join(',') : `${clickedCoords.lat.toFixed(4)}, ${clickedCoords.lng.toFixed(4)}`;
+                                                    const updated = {
+                                                        ...postForm,
+                                                        destination: cleanAddr,
+                                                        destination_lat: clickedCoords.lat,
+                                                        destination_lng: clickedCoords.lng
+                                                    };
+                                                    setPostForm(updated);
+                                                    triggerRouteRecalculation(updated);
+                                                    setClickedCoords(null);
+                                                    toast.success("Dropoff Destination set!");
+                                                }}
+                                                className="bg-emerald-600 text-white font-bold py-2 rounded-xl text-[9px] text-center transition-colors hover:bg-emerald-700"
+                                                disabled={loadingAddress}
+                                            >
+                                                Set End
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const name = clickedAddress ? clickedAddress.split(',')[0] : `Stop ${postForm.waypoints.length + 1}`;
+                                                    const updated = {
+                                                        ...postForm,
+                                                        waypoints: [...postForm.waypoints, { location_name: name, lat: clickedCoords.lat, lng: clickedCoords.lng }]
+                                                    };
+                                                    setPostForm(updated);
+                                                    triggerRouteRecalculation(updated);
+                                                    setClickedCoords(null);
+                                                    toast.success("Waypoint Stop added!");
+                                                }}
+                                                className="bg-amber-600 text-white font-bold py-2 rounded-xl text-[9px] text-center transition-colors hover:bg-amber-700"
+                                                disabled={loadingAddress}
+                                            >
+                                                Add Stop
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {postRouteInfo && (
+                                    <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <div>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Distance</span>
+                                            <span className="text-sm font-bold text-slate-800">{postRouteInfo.distance} km</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Estimated Duration</span>
+                                            <span className="text-sm font-bold text-slate-800">
+                                                {Math.floor(postRouteInfo.duration / 60) > 0 ? `${Math.floor(postRouteInfo.duration / 60)}h ` : ''}
+                                                {postRouteInfo.duration % 60}m
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── 3. OFFERED TRIPS QUEUE TAB ── */}
+                {activeTab === 'my' && (
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800 tracking-tight">Your Published Trips</h3>
+                            <p className="text-xs text-slate-500 mt-1">Review traveler seat requests, start journeys, or complete split settlements.</p>
+                        </div>
+
+                        {myRides.length === 0 ? (
+                            <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+                                <Car className="w-12 h-12 text-slate-300 mx-auto" />
+                                <h4 className="text-sm font-bold text-slate-800 mt-4">No rides published yet</h4>
+                                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                                    Click "Offer a Ride" tab to register your first intercity trip.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {myRides.map((ride) => {
+                                    const expanded = expandedRides[ride.id];
+                                    const bookings = rideBookings[ride.id] || [];
+                                    const loadingBook = loadingBookings[ride.id];
+                                    
+                                    return (
+                                        <div key={ride.id} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4 transition-all">
+                                            
+                                            {/* Ride Summary Header */}
+                                            <div className="flex justify-between items-start flex-wrap gap-4">
+                                                <div className="space-y-1">
+                                                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                        {ride.origin} ➔ {ride.destination}
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                            ride.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' :
+                                                            ride.status === 'COMPLETED' ? 'bg-primary-50 text-primary-600' :
+                                                            ride.status === 'CANCELLED' ? 'bg-slate-100 text-slate-500' : 'bg-yellow-50 text-yellow-600'
+                                                        }`}>
+                                                            {ride.status}
+                                                        </span>
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500">
+                                                        Leaves: <span className="font-semibold text-slate-700">{new Date(ride.departure_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-3">
+                                                    {ride.status === 'ACTIVE' && (
+                                                        <>
+                                                            <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => handleCancelRide(ride.id)}>
+                                                                Cancel Ride
+                                                            </Button>
+                                                            <Button variant="primary" size="sm" onClick={() => handleCompleteRide(ride.id)}>
+                                                                Mark Completed
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                    
+                                                    <button onClick={() => toggleRideExpand(ride.id)} className="p-2 hover:bg-slate-50 rounded-xl border border-slate-200 text-slate-600">
+                                                        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Expandable Booking Request Details */}
+                                            {expanded && (
+                                                <div className="border-t border-slate-100 pt-4 space-y-4 animate-fade-in">
+                                                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Passenger Booking Requests</h5>
+                                                    
+                                                    {loadingBook ? (
+                                                        <Skeleton variant="text" className="h-10 w-full" />
+                                                    ) : bookings.length === 0 ? (
+                                                        <p className="text-xs text-slate-500">No seat requests received for this trip yet.</p>
+                                                    ) : (
+                                                        <div className="divide-y divide-slate-100">
+                                                            {bookings.map((book) => (
+                                                                <div key={book.id} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
+                                                                    <div className="flex items-center gap-3">
+                                                                        {book.traveler_pic ? (
+                                                                            <img src={book.traveler_pic} alt={book.traveler_name} className="w-10 h-10 rounded-xl object-cover" />
+                                                                        ) : (
+                                                                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-xs">
+                                                                                {book.traveler_name[0]}
+                                                                            </div>
+                                                                        )}
+                                                                        <div>
+                                                                            <h5 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                                                {book.traveler_name}
+                                                                                <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
+                                                                                    {book.status}
+                                                                                </span>
+                                                                            </h5>
+                                                                            <p className="text-[10px] text-slate-500 mt-0.5">
+                                                                                Requested: <span className="font-semibold text-slate-700">{book.seats_booked} seat(s)</span> · Fare share: <span className="font-bold text-slate-700">₹{Math.round(book.total_fare)}</span>
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {book.status === 'PENDING' && (
+                                                                        <div className="flex gap-2">
+                                                                            <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 text-xs" onClick={() => handleRejectRequest(book.id, ride.id)}>
+                                                                                Reject
+                                                                            </Button>
+                                                                            <Button variant="success" size="sm" className="text-xs" onClick={() => handleAcceptRequest(book.id, ride.id)}>
+                                                                                Accept
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                             )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
                 )}
+
             </div>
-        </>
+        </div>
     );
 }

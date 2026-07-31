@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import axiosInstance from "../utils/axiosInstance";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
+import { Skeleton } from "../components/Skeleton";
+import { toast } from "react-hot-toast";
 import {
   Clock,
   CheckCircle,
@@ -14,40 +18,35 @@ import {
   Phone,
   Mail,
   User,
+  ShieldAlert,
+  IndianRupee,
+  Activity,
+  UserCheck,
+  CreditCard,
+  Trash
 } from "lucide-react";
-
-const theme = {
-  bgCard: "#FFFFFF",
-  border: "#E2E8F0",
-  textPrimary: "#093C5D",
-  textSecondary: "#6B7280",
-  textMuted: "#94A3B8",
-  accent: "#3B7597",
-  accentDark: "#093C5D",
-  accentLight: "#EFF6FF",
-  success: "#10B981",
-  successBg: "#EFFDF4",
-  successText: "#10B981",
-  warning: "#F59E0B",
-  warningBg: "#FEF3C7",
-  warningText: "#D97706",
-  danger: "#EF4444",
-  dangerBg: "#FEE2E2",
-  errorText: "#EF4444",
-};
 
 export default function AdminPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState("verifications"); // verifications, users, payments, sos
   const [verifications, setVerifications] = useState([]);
-  const [allVerifications, setAllVerifications] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [refunds, setRefunds] = useState([]);
+  const [stats, setStats] = useState({ total_users: 0, completed_rides: 0, active_rides: 0, total_revenue: 0 });
+  const [activeSos, setActiveSos] = useState([]);
+  const [demandCorridors, setDemandCorridors] = useState([]);
+  const [moderationText, setModerationText] = useState("");
+  const [moderationResult, setModerationResult] = useState(null);
+  const [moderating, setModerating] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Reject drivers state
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(null);
-  const [alert, setAlert] = useState({ type: "", message: "" });
 
   useEffect(() => {
     if (user && !user.is_admin) {
@@ -55,390 +54,593 @@ export default function AdminPage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchAdminData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [pendingRes, allRes] = await Promise.all([
-        axiosInstance.get("/verification/admin/pending"),
-        axiosInstance.get("/verification/admin/all"),
-      ]);
-      setVerifications(pendingRes.data.verifications || []);
-      setAllVerifications(allRes.data.verifications || []);
+      // 1. Fetch verifications
+      const verifRes = await axiosInstance.get("/verification/admin/all");
+      setVerifications(verifRes.data.verifications || []);
+
+      // 2. Fetch stats & SOS signals
+      const statsRes = await axiosInstance.get("/admin/stats");
+      setStats(statsRes.data.stats || { total_users: 0, completed_rides: 0, active_rides: 0, total_revenue: 0 });
+      setActiveSos(statsRes.data.active_sos || []);
+
+      // 3. Fetch users
+      const usersRes = await axiosInstance.get("/admin/users");
+      setUsers(usersRes.data.users || []);
+
+      // 4. Fetch payments & refunds
+      const paymentsRes = await axiosInstance.get("/admin/payments");
+      setPayments(paymentsRes.data.payments || []);
+      setRefunds(paymentsRes.data.refunds || []);
+
+      // 5. Fetch demand corridors
+      const demandRes = await axiosInstance.get("/ai/demand-analytics");
+      setDemandCorridors(demandRes.data.corridors || []);
+
     } catch (err) {
-      console.error("Failed to fetch verifications:", err);
+      console.error("Admin dashboard fetch error:", err);
+      toast.error("Failed to retrieve administrative data.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (id) => {
+  const handleCheckReview = async (e) => {
+    e.preventDefault();
+    if (!moderationText.trim()) return;
+    setModerating(true);
+    try {
+      const res = await axiosInstance.post("/ai/check-review", { review_text: moderationText });
+      setModerationResult(res.data);
+      toast.success("Content moderation check complete!");
+    } catch (err) {
+      toast.error("Failed to run content check.");
+    } finally {
+      setModerating(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
+  // Approve driver verification
+  const handleApproveDriver = async (id) => {
     setActionLoading(id);
     try {
       await axiosInstance.put(`/verification/admin/${id}/approve`);
-      setAlert({ type: "success", message: "Driver verified and approved successfully!" });
-      fetchData();
+      toast.success("Driver credentials verified and approved!");
+      fetchAdminData();
     } catch (err) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Failed to approve" });
+      toast.error(err.response?.data?.message || "Failed to approve application.");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleReject = async () => {
+  // Reject driver verification
+  const handleRejectDriver = async () => {
     if (!rejectReason.trim()) return;
     setActionLoading(rejectModal);
     try {
       await axiosInstance.put(`/verification/admin/${rejectModal}/reject`, {
-        rejection_reason: rejectReason,
+        rejection_reason: rejectReason
       });
-      setAlert({ type: "success", message: "Verification rejected." });
+      toast.success("Driver application marked as rejected.");
       setRejectModal(null);
       setRejectReason("");
-      fetchData();
+      fetchAdminData();
     } catch (err) {
-      setAlert({ type: "error", message: err.response?.data?.message || "Failed to reject" });
+      toast.error(err.response?.data?.message || "Failed to reject application.");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      PENDING: { bg: theme.warningBg, color: theme.warningText, label: "Pending", icon: Clock },
-      APPROVED: { bg: theme.successBg, color: theme.success, label: "Approved", icon: CheckCircle },
-      REJECTED: { bg: theme.dangerBg, color: theme.danger, label: "Rejected", icon: XCircle },
-    };
-    const s = styles[status] || styles.PENDING;
-    const IconComponent = s.icon;
-    return (
-      <span style={{
-        padding: "4px 12px", borderRadius: "100px",
-        backgroundColor: s.bg, color: s.color,
-        fontSize: "12px", fontWeight: "700",
-        fontFamily: "'DM Sans', sans-serif",
-        display: "flex", alignItems: "center", gap: "4px",
-        border: `1px solid rgba(9, 60, 93, 0.03)`
-      }}>
-        <IconComponent size={12} />
-        {s.label}
-      </span>
-    );
+  // Update User Role/Admin Status
+  const handleUpdateRole = async (userId, role, isAdmin) => {
+    try {
+      await axiosInstance.put(`/admin/users/${userId}/role`, {
+        role,
+        is_admin: isAdmin
+      });
+      toast.success("User credentials updated successfully.");
+      fetchAdminData();
+    } catch (err) {
+      toast.error("Failed to update user parameters.");
+    }
   };
 
-  const displayList = activeTab === "pending" ? verifications : allVerifications;
+  // Resolve Active SOS Threat
+  const handleResolveSos = async (bookingId) => {
+    try {
+      await axiosInstance.put(`/admin/sos/${bookingId}/resolve`);
+      toast.success("SOS alarm deactivated successfully!");
+      fetchAdminData();
+    } catch (err) {
+      toast.error("Failed to resolve SOS alarm.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto py-8">
+        <Skeleton variant="rect" className="h-16 w-full" />
+        <Skeleton variant="rect" className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-      <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
-        
-        {/* Navigation Action Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-          <button onClick={() => navigate("/dashboard")} style={{
-            background: "white", border: `1px solid ${theme.border}`,
-            borderRadius: "8px", padding: "8px 14px", color: theme.textSecondary,
-            cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
-            display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
-            fontWeight: "600"
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = theme.textPrimary; e.currentTarget.style.borderColor = theme.accent; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = theme.textSecondary; e.currentTarget.style.borderColor = theme.border; }}
-          >
-            <ArrowLeft size={14} /> Back to Dashboard
-          </button>
+    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
+      
+      {/* Header */}
+      <div className="flex justify-between items-center flex-wrap gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary-600" /> Admin Command Center
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">Audit traveler verifications, cost splitting payments, and monitor safety alerts.</p>
         </div>
+        <Button variant="ghost" size="sm" className="text-slate-500 hover:bg-slate-50" onClick={() => navigate("/dashboard")}>
+          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        </Button>
+      </div>
 
-        {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "28px" }}>
-          {[
-            { icon: Clock, label: "Pending Audit", value: verifications.length, color: theme.warningText, bg: theme.warningBg },
-            { icon: CheckCircle, label: "Approved Drivers", value: allVerifications.filter(v => v.status === "APPROVED").length, color: theme.success, bg: theme.successBg },
-            { icon: XCircle, label: "Rejected Applications", value: allVerifications.filter(v => v.status === "REJECTED").length, color: theme.danger, bg: theme.dangerBg },
-          ].map((s, idx) => {
-            const IconComp = s.icon;
-            return (
-              <div key={idx} style={{
-                backgroundColor: theme.bgCard,
-                border: `1px solid ${theme.border}`, borderRadius: "16px",
-                padding: "20px 24px", display: "flex", alignItems: "center", gap: "16px",
-                boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
-              }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "12px", backgroundColor: s.bg, display: "flex", alignItems: "center", justifyContent: "center", color: s.color, flexShrink: 0 }}>
-                  <IconComp size={22} />
-                </div>
-                <div>
-                  <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "28px", fontWeight: "800", color: theme.textPrimary, lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textSecondary, marginTop: "4px", fontWeight: "600" }}>{s.label}</div>
-                </div>
+      {/* Flashing SOS emergency banner */}
+      {activeSos.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-3xl p-5 flex items-center justify-between flex-wrap gap-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-red-950">🚨 ACTIVE EMERGENCY SOS ALARMS ({activeSos.length})</h4>
+              <p className="text-xs text-red-700 mt-0.5">Co-travelers need urgent assistance. Track coordinates immediately.</p>
+            </div>
+          </div>
+          <Button variant="danger" size="sm" onClick={() => setActiveTab("sos")}>
+            Open Safety Desk
+          </Button>
+        </div>
+      )}
+
+      {/* STATS OVERVIEW ROW */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Active Co-Travelers", value: stats.total_users, desc: "Registered platform users", icon: UserCheck, color: "text-blue-600 bg-blue-50" },
+          { label: "Completed Journeys", value: stats.completed_rides, desc: "Cost-split rides completed", icon: CheckCircle, color: "text-emerald-600 bg-emerald-50" },
+          { label: "Active Trips", value: stats.active_rides, desc: "Ongoing/available intercity trips", icon: Activity, color: "text-indigo-600 bg-indigo-50" },
+          { label: "Platform Revenue Settle", value: `₹${Math.round(stats.total_revenue)}`, desc: "Total transactions captured", icon: IndianRupee, color: "text-amber-600 bg-amber-50" }
+        ].map((stat, idx) => {
+          const IconComp = stat.icon;
+          return (
+            <div key={idx} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3 flex items-center gap-4">
+              <div className={`p-3 rounded-2xl ${stat.color} flex-shrink-0`}>
+                <IconComp className="w-6 h-6" />
               </div>
-            );
-          })}
-        </div>
-
-        {/* Alert */}
-        {alert.message && (
-          <div style={{
-            padding: "12px 16px", borderRadius: "10px", marginBottom: "20px",
-            backgroundColor: alert.type === "success" ? theme.successBg : theme.dangerBg,
-            border: `1px solid ${alert.type === "success" ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`,
-            color: alert.type === "success" ? theme.success : theme.danger,
-            fontSize: "13px", display: "flex", alignItems: "center", gap: "8px",
-            fontWeight: "600"
-          }}>
-            {alert.type === "success" ? <CheckCircle size={16} /> : <AlertTriangle size={16} />} 
-            {alert.message}
-            <button onClick={() => setAlert({ type: "", message: "" })} style={{ marginLeft: "auto", background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "16px" }}>✕</button>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div style={{
-          display: "flex", gap: "4px", backgroundColor: "rgba(9, 60, 93, 0.03)",
-          borderRadius: "12px", padding: "4px", marginBottom: "24px",
-          width: "fit-content", border: `1px solid ${theme.border}`,
-        }}>
-          {[
-            { id: "pending", label: `⏳ Pending Requests (${verifications.length})` },
-            { id: "all", label: "📋 All Verification Audits" },
-          ].map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              padding: "9px 20px", borderRadius: "8px", border: "none",
-              backgroundColor: activeTab === tab.id ? "white" : "transparent",
-              color: activeTab === tab.id ? theme.textPrimary : theme.textSecondary,
-              cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-              fontSize: "13.5px", fontWeight: "600",
-              transition: "all 0.2s ease",
-              boxShadow: activeTab === tab.id ? "0 4px 10px rgba(9, 60, 93, 0.03)" : "none"
-            }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* List content */}
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "60px", color: theme.accent, fontSize: "16px" }}>
-            Loading verifications...
-          </div>
-        ) : displayList.length === 0 ? (
-          <div style={{
-            backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`,
-            borderRadius: "20px", padding: "60px", textAlign: "center",
-            boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
-          }}>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎉</div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "700", color: theme.textPrimary, marginBottom: "8px" }}>
-              {activeTab === "pending" ? "No Pending Verifications" : "No Records Found"}
+              <div>
+                <h5 className="text-lg font-black text-slate-800">{stat.value}</h5>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</p>
+                <p className="text-[9px] text-slate-500 mt-0.5">{stat.desc}</p>
+              </div>
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textSecondary }}>
-              {activeTab === "pending" ? "All caught up! No drivers waiting for audit." : "No verification submissions to display."}
+          );
+        })}
+      </div>
+
+      {/* TAB BAR NAVIGATION */}
+      <div className="flex border-b border-slate-200 gap-6">
+        {[
+          { id: "verifications", label: `⏳ Driver Audits (${verifications.filter(v => v.status === 'PENDING').length})` },
+          { id: "users", label: `📋 Users Directory` },
+          { id: "payments", label: `💳 Payments Settle` },
+          { id: "sos", label: `🚨 Safety Alarms (${activeSos.length})` },
+          { id: "demand", label: `📈 Route Demand` },
+          { id: "moderator", label: `🤖 Review Moderator` }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`py-3.5 text-sm font-semibold border-b-2 transition-all focus:outline-none ${
+              activeTab === tab.id ? 'border-primary-600 text-primary-600 font-bold' : 'border-transparent text-slate-500'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── 1. DRIVER AUDITS SUB-PAGE ── */}
+      {activeTab === "verifications" && (
+        <div className="space-y-4">
+          {verifications.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+              <CheckCircle className="w-12 h-12 text-slate-300 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800 mt-4">All Verifications Done</h4>
+              <p className="text-xs text-slate-500 mt-1">No driver verification applications are currently pending audit review.</p>
             </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {displayList.map((v) => (
-              <div key={v.id} style={{
-                backgroundColor: theme.bgCard,
-                border: `1px solid ${theme.border}`, borderRadius: "20px",
-                padding: "24px", transition: "all 0.2s",
-                boxShadow: "0 4px 20px rgba(9, 60, 93, 0.01)"
-              }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = theme.accent}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = theme.border}
-              >
-                {/* Header row */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div style={{
-                      width: "46px", height: "46px", borderRadius: "12px",
-                      background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "white", fontSize: "18px", fontWeight: "700",
-                      fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
-                    }}>
-                      {v.name?.[0] || "U"}
+          ) : (
+            verifications.map((v) => (
+              <div key={v.id} className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                
+                {/* Header */}
+                <div className="flex justify-between items-center flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-bold text-xs">
+                      {v.name[0]}
                     </div>
                     <div>
-                      <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "15px", fontWeight: "700", color: theme.textPrimary }}>{v.name}</div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "12.5px", color: theme.textSecondary }}>{v.email} · {v.phone || "No phone number"}</div>
+                      <h4 className="text-xs font-bold text-slate-800">{v.name}</h4>
+                      <p className="text-[10px] text-slate-500">{v.email} · {v.phone || "No phone number"}</p>
                     </div>
                   </div>
-                  {getStatusBadge(v.status)}
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                    v.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                    v.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
+                  }`}>
+                    {v.status}
+                  </span>
                 </div>
 
-                {/* Details grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "20px" }}>
-                  {[
-                    { label: "License Number", value: v.license_number, icon: FileText },
-                    { label: "License Expiry Date", value: new Date(v.license_expiry).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }), icon: Calendar },
-                    { label: "Aadhaar Number", value: v.aadhar_number ? `XXXX XXXX ${v.aadhar_number.slice(-4)}` : "—", icon: FileText },
-                    { label: "Submitted On", value: new Date(v.submitted_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }), icon: Calendar },
-                    { label: "License Scan Image", value: v.license_image_url ? "Provided" : "Not Provided", color: v.license_image_url ? theme.success : theme.danger, icon: FileText },
-                    { label: "Aadhaar Scan Image", value: v.aadhar_image_url ? "Provided" : "Not Provided", color: v.aadhar_image_url ? theme.success : theme.danger, icon: FileText },
-                  ].map((item, idx) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <div key={idx} style={{
-                        backgroundColor: "#F9FAFB", borderRadius: "12px",
-                        padding: "12px 14px", border: `1px solid ${theme.border}`
-                      }}>
-                        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: theme.textSecondary, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}><IconComponent size={10} /> {item.label}</div>
-                        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: item.color || theme.textPrimary, fontWeight: "700" }}>{item.value}</div>
-                      </div>
-                    );
-                  })}
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">License Number</span>
+                    <span className="font-bold text-slate-700 mt-0.5 block">{v.license_number}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">License Expiry</span>
+                    <span className="font-bold text-slate-700 mt-0.5 block">{new Date(v.license_expiry).toLocaleDateString("en-IN", { dateStyle: 'medium' })}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Aadhaar Number</span>
+                    <span className="font-bold text-slate-700 mt-0.5 block">XXXX XXXX {v.aadhar_number?.slice(-4)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Submitted On</span>
+                    <span className="font-bold text-slate-700 mt-0.5 block">{new Date(v.submitted_at).toLocaleDateString("en-IN")}</span>
+                  </div>
                 </div>
 
-                {/* Document Links */}
+                {/* Image Upload Previews */}
                 {(v.license_image_url || v.aadhar_image_url) && (
-                  <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                  <div className="flex gap-3 flex-wrap">
                     {v.license_image_url && (
-                      <a href={v.license_image_url} target="_blank" rel="noreferrer" style={{
-                        padding: "8px 14px", backgroundColor: theme.accentLight,
-                        border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: "8px",
-                        color: theme.textPrimary, textDecoration: "none",
-                        fontSize: "12px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
-                        display: "flex", alignItems: "center", gap: "6px",
-                      }}>
-                        🪪 View License Document
+                      <a href={v.license_image_url} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-lg border border-primary-100">
+                        View License Document ➔
                       </a>
                     )}
                     {v.aadhar_image_url && (
-                      <a href={v.aadhar_image_url} target="_blank" rel="noreferrer" style={{
-                        padding: "8px 14px", backgroundColor: theme.accentLight,
-                        border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: "8px",
-                        color: theme.textPrimary, textDecoration: "none",
-                        fontSize: "12px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif",
-                        display: "flex", alignItems: "center", gap: "6px",
-                      }}>
-                        🪪 View Aadhaar Document
+                      <a href={v.aadhar_image_url} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-lg border border-primary-100">
+                        View Aadhaar Document ➔
                       </a>
                     )}
                   </div>
                 )}
 
-                {/* Rejection notice details */}
-                {v.status === "REJECTED" && v.rejection_reason && (
-                  <div style={{
-                    padding: "12px 14px", backgroundColor: theme.dangerBg,
-                    border: `1px solid rgba(239, 68, 68, 0.1)`, borderRadius: "10px",
-                    marginBottom: "16px",
-                  }}>
-                    <div style={{ fontSize: "11px", color: theme.danger, fontWeight: "700", marginBottom: "4px", fontFamily: "'DM Sans', sans-serif" }}>REJECTION REASON DETAILS</div>
-                    <div style={{ fontSize: "13px", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif", fontWeight: "500" }}>{v.rejection_reason}</div>
+                {/* Rejection Notice */}
+                {v.status === 'REJECTED' && v.rejection_reason && (
+                  <div className="bg-red-50/50 border border-red-100 p-3 rounded-xl text-xs text-red-900 leading-relaxed font-mono">
+                    <span className="font-bold block uppercase text-[9px] mb-0.5">Rejection Reason</span>
+                    {v.rejection_reason}
                   </div>
                 )}
 
-                {/* Action buttons */}
-                {v.status === "PENDING" && (
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                      onClick={() => handleApprove(v.id)}
-                      disabled={actionLoading === v.id}
-                      style={{
-                        padding: "10px 24px",
-                        background: actionLoading === v.id ? theme.border : theme.textPrimary,
-                        color: "white", border: "none", borderRadius: "10px",
-                        fontSize: "13px", fontWeight: "700", cursor: actionLoading === v.id ? "not-allowed" : "pointer",
-                        fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s ease",
-                        boxShadow: "0 4px 12px rgba(9, 60, 93, 0.15)",
-                        display: "flex", alignItems: "center", gap: "6px",
-                      }}
-                      onMouseEnter={(e) => { if (actionLoading !== v.id) { e.currentTarget.style.backgroundColor = "#07304b"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.textPrimary; e.currentTarget.style.transform = "translateY(0)"; }}
-                    >
-                      {actionLoading === v.id ? "Processing..." : "Approve Application"}
-                    </button>
-                    <button
-                      onClick={() => { setRejectModal(v.id); setRejectReason(""); }}
-                      disabled={actionLoading === v.id}
-                      style={{
-                        padding: "10px 24px",
-                        background: "white",
-                        color: theme.danger, border: `1px solid ${theme.border}`,
-                        borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                        cursor: actionLoading === v.id ? "not-allowed" : "pointer",
-                        fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s ease",
-                        display: "flex", alignItems: "center", gap: "6px",
-                      }}
-                      onMouseEnter={(e) => { if (actionLoading !== v.id) { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; e.currentTarget.style.transform = "translateY(-1px)"; } }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; e.currentTarget.style.transform = "translateY(0)"; }}
-                    >
-                      Reject Application
-                    </button>
+                {/* Driver Action Buttons */}
+                {v.status === 'PENDING' && (
+                  <div className="flex gap-2">
+                    <Button variant="success" size="sm" onClick={() => handleApproveDriver(v.id)} isLoading={actionLoading === v.id}>
+                      Approve Driver
+                    </Button>
+                    <Button variant="danger" size="sm" onClick={() => { setRejectModal(v.id); setRejectReason(""); }}>
+                      Reject
+                    </Button>
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
 
-      {/* Reject Modal */}
-      {rejectModal && (
-        <div style={{
-          position: "fixed", inset: 0, backgroundColor: "rgba(9, 60, 93, 0.4)",
-          backdropFilter: "blur(4px)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyStyle: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            backgroundColor: "white", border: `1px solid ${theme.border}`,
-            borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "440px",
-            boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)",
-          }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: theme.textPrimary, marginBottom: "8px" }}>
-              Reject Application
+      {/* ── 2. USERS DIRECTORY SUB-PAGE ── */}
+      {activeTab === "users" && (
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-slate-100">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Platform Users Directory</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="p-4">User</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">Role</th>
+                  <th className="p-4">Admin Status</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50/50">
+                    <td className="p-4 font-bold text-slate-900">{u.name}</td>
+                    <td className="p-4">{u.email}</td>
+                    <td className="p-4">
+                      <select 
+                        defaultValue={u.role} 
+                        onChange={(e) => handleUpdateRole(u.id, e.target.value, u.is_admin)}
+                        className="bg-white border border-slate-200 rounded-lg p-1.5 font-semibold text-slate-700 outline-none"
+                      >
+                        <option value="USER">USER</option>
+                        <option value="DRIVER">DRIVER</option>
+                      </select>
+                    </td>
+                    <td className="p-4">
+                      <input 
+                        type="checkbox" 
+                        defaultChecked={u.is_admin} 
+                        onChange={(e) => handleUpdateRole(u.id, u.role, e.target.checked)}
+                        className="w-4 h-4 rounded accent-primary-600 cursor-pointer"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <span className="text-[10px] text-slate-400 font-mono block">Registered {new Date(u.created_at).toLocaleDateString()}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. PAYMENTS & REFUNDS SUB-PAGE ── */}
+      {activeTab === "payments" && (
+        <div className="space-y-6">
+          
+          {/* Active Settle Logs */}
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-slate-100">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Co-Traveler Checkout Settle Ledger</h3>
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: theme.textSecondary, marginBottom: "20px", fontWeight: "500" }}>
-              Please specify the reason for rejecting this verification request.
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                    <th className="p-4">Traveler</th>
+                    <th className="p-4">Order ID</th>
+                    <th className="p-4">Amount</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Paid At</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {payments.map((p) => (
+                    <tr key={p.id} className="hover:bg-slate-50/50">
+                      <td className="p-4 font-bold text-slate-900">{p.traveler_name}</td>
+                      <td className="p-4 font-mono text-[10px] text-slate-400">{p.razorpay_order_id}</td>
+                      <td className="p-4 font-bold">₹{Math.round(p.amount)}</td>
+                      <td className="p-4">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          p.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' :
+                          p.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-500">
+                        {p.paid_at ? new Date(p.paid_at).toLocaleString() : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </div>
+
+          {/* Refund audit logs */}
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-slate-100">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Automated Refund Logs</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                    <th className="p-4">Traveler</th>
+                    <th className="p-4">Refund ID</th>
+                    <th className="p-4">Amount</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Dispatched At</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {refunds.map((ref) => (
+                    <tr key={ref.id} className="hover:bg-slate-50/50">
+                      <td className="p-4 font-bold text-slate-900">{ref.traveler_name}</td>
+                      <td className="p-4 font-mono text-[10px] text-slate-400">{ref.razorpay_refund_id}</td>
+                      <td className="p-4 font-bold text-red-600">₹{Math.round(ref.refund_amount)}</td>
+                      <td className="p-4">
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                          {ref.status}
+                        </span>
+                      </td>
+                      <td className="p-4 text-slate-500">
+                        {new Date(ref.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── 4. SAFETY ALARMS SUB-PAGE (ACTIVE SOS) ── */}
+      {activeTab === "sos" && (
+        <div className="space-y-4">
+          {activeSos.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+              <CheckCircle className="w-12 h-12 text-slate-300 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800 mt-4">Safety Desk Normal</h4>
+              <p className="text-xs text-slate-500 mt-1">No active emergency signals or SOS alerts require coordinates lookup.</p>
+            </div>
+          ) : (
+            activeSos.map((sos) => (
+              <div key={sos.booking_id} className="bg-red-50/70 border border-red-200 rounded-3xl p-6 shadow-md space-y-4 flex flex-col md:flex-row md:items-center justify-between gap-5 animate-pulse">
+                
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-red-700 uppercase tracking-widest flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4" /> Active Passenger Danger Alert
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3.5 rounded-2xl border border-red-100 text-xs">
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold block">Passenger</span>
+                      <span className="font-bold text-slate-700 block mt-0.5">{sos.passenger_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold block">Driver</span>
+                      <span className="font-bold text-slate-700 block mt-0.5">{sos.driver_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold block">Vehicle Number</span>
+                      <span className="font-bold text-slate-700 block mt-0.5">{sos.vehicle_number || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold block">Route Path</span>
+                      <span className="font-bold text-slate-700 block mt-0.5">{sos.origin} ➔ {sos.destination}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 self-start md:self-center">
+                  <a href={`/track-sos/${sos.booking_id}`} target="_blank" rel="noreferrer" className="text-xs font-bold bg-slate-900 text-white px-4 py-2.5 rounded-xl flex items-center gap-1">
+                    Trace Coordinates Live
+                  </a>
+                  <Button variant="success" size="sm" onClick={() => handleResolveSos(sos.booking_id)}>
+                    Mark Resolved
+                  </Button>
+                </div>
+
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── 5. CORRIDOR DEMAND SUB-PAGE ── */}
+      {activeTab === "demand" && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-fade-in">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Intercity Travel Demand Density</h3>
+          </div>
+
+          {demandCorridors.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-4">No demand metrics compiled yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {demandCorridors.map((c, idx) => (
+                <div key={idx} className="space-y-1.5 text-xs">
+                  <div className="flex justify-between items-baseline text-slate-700">
+                    <span className="font-bold">{c.origin} ➔ {c.destination}</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">{c.request_count} requests ({c.total_seats} seats)</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div 
+                      className="bg-primary-600 h-2 rounded-full" 
+                      style={{ width: `${Math.min((c.request_count / 10) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 6. REVIEW MODERATION SUB-PAGE ── */}
+      {activeTab === "moderator" && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-fade-in">
+          <div className="border-b border-slate-100 pb-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">AI Content Moderation Sandbox</h3>
+          </div>
+
+          <form onSubmit={handleCheckReview} className="space-y-4">
             <textarea
+              rows={4}
+              value={moderationText}
+              onChange={(e) => setModerationText(e.target.value)}
+              placeholder="Paste co-traveler review text here to scan for spam/fraud content patterns..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-700 outline-none resize-none"
+              required
+            />
+            <Button type="submit" variant="primary" className="w-full font-bold" isLoading={moderating}>
+              Analyze Content Safety
+            </Button>
+          </form>
+
+          {moderationResult && (
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3 text-xs animate-fade-in">
+              <h4 className="font-bold text-slate-800">Scan Results:</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-3 rounded-xl border border-slate-100 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Spam Score</span>
+                  <span className={`text-lg font-black mt-1 block ${
+                    moderationResult.rating > 70 ? 'text-red-500' :
+                    moderationResult.rating > 30 ? 'text-amber-500' : 'text-emerald-500'
+                  }`}>
+                    {moderationResult.rating} / 100
+                  </span>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-100 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase">Moderation Status</span>
+                  <span className={`text-lg font-black mt-1 block ${moderationResult.is_spam ? 'text-red-500' : 'text-emerald-500'}`}>
+                    {moderationResult.is_spam ? 'Flagged Spam' : 'Passed Review'}
+                  </span>
+                </div>
+              </div>
+              <p className="text-slate-600 bg-white p-3 rounded-xl border border-slate-100/55 leading-relaxed">
+                <span className="font-bold text-slate-800">Safety Context:</span> {moderationResult.reason}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* REJECT DRIVER REASON DIALOG */}
+      {rejectModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-sm w-full p-6 space-y-4 shadow-2xl animate-fade-in-up">
+            <div className="pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">Reject Application</h3>
+              <p className="text-[11px] text-slate-500 mt-1">Specify verification mismatch reasons below.</p>
+            </div>
+            
+            <textarea
+              rows={4}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g. Uploaded Aadhaar image is blurry or expired driving license."
-              rows={4}
-              style={{
-                width: "100%", padding: "12px 14px",
-                backgroundColor: "#F9FAFB", border: `1px solid ${theme.border}`,
-                borderRadius: "12px", color: theme.textPrimary,
-                fontSize: "14px", fontFamily: "'DM Sans', sans-serif",
-                outline: "none", resize: "vertical", boxSizing: "border-box",
-                marginBottom: "20px",
-              }}
+              placeholder="e.g. Driving License Scan is blurry, or Expired credentials."
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-700 outline-none resize-none"
             />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => { setRejectModal(null); setRejectReason(""); }} style={{
-                flex: 1, padding: "11px", backgroundColor: "white",
-                border: `1px solid ${theme.border}`, borderRadius: "10px",
-                color: theme.textSecondary, cursor: "pointer",
-                fontFamily: "'DM Sans', sans-serif", fontSize: "14px", fontWeight: "600",
-              }}>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setRejectModal(null)}>
                 Cancel
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={!rejectReason.trim() || actionLoading}
-                style={{
-                  flex: 1, padding: "11px",
-                  background: !rejectReason.trim() ? theme.border : theme.danger,
-                  border: "none", borderRadius: "10px",
-                  color: "white", cursor: !rejectReason.trim() ? "not-allowed" : "pointer",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: "14px", fontWeight: "700",
-                }}
-              >
-                {actionLoading ? "Rejecting..." : "Confirm Reject"}
-              </button>
+              </Button>
+              <Button variant="danger" className="flex-1 font-bold" onClick={handleRejectDriver} isLoading={actionLoading}>
+                Confirm Reject
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      <style>{`* { box-sizing: border-box; }`}</style>
-    </>
+    </div>
   );
 }

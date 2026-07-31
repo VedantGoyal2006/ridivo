@@ -17,7 +17,7 @@ router.post('/signup', loginRateLimiter, validateSignup, signup);
 router.post('/login', loginRateLimiter, validateLogin, login);
 router.post('/logout', protect, logout);
 
-// Google OAuth routes
+// Google OAuth routes {for both signup and signin}
 router.get('/google', passport.authenticate('google', { 
     scope: ['profile', 'email'] 
 }));

@@ -5,12 +5,12 @@ const keyGenerator = (req) => {
     if (req.user && req.user.id) {
         return `user:${req.user.id}`;
     }
-    return `ip:${req.ip}`;
+    return req.ip;
 };
 
 // 1. Auth rate limiter: Max 5 attempts per minute
 export const loginRateLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 60 * 1000, // 1 minute => {1000 == 1sec}
     max: 5,
     message: { message: 'Too many login attempts. Please try again after 1 minute.' },
     standardHeaders: true,

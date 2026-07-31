@@ -28,6 +28,29 @@ export const initSocket = (server) => {
             socket.userId = userId;
         });
 
+        // ── REAL-TIME LOCATION SHARING ──
+        // Join ride room
+        socket.on('join-ride', (rideId) => {
+            if (!rideId) return;
+            socket.join(`ride_${rideId}`);
+            console.log(`Socket ${socket.id} joined room: ride_${rideId}`);
+        });
+
+        // Leave ride room
+        socket.on('leave-ride', (rideId) => {
+            if (!rideId) return;
+            socket.leave(`ride_${rideId}`);
+            console.log(`Socket ${socket.id} left room: ride_${rideId}`);
+        });
+
+        // Broadcast driver live coordinate changes to passengers
+        socket.on('update-location', (data) => {
+            const { ride_id, lat, lng } = data;
+            if (!ride_id || !lat || !lng) return;
+            // Send location-update back to the room excluding the sender (driver)
+            socket.to(`ride_${ride_id}`).emit('location-update', { lat, lng });
+        });
+
         socket.on('disconnect', () => {
             console.log(`Socket disconnected: ${socket.id}`);
             if (socket.userId && userSockets.has(socket.userId)) {

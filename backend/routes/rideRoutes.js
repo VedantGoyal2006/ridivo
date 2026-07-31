@@ -9,7 +9,8 @@ import {
     updateRide,
     deleteRide,
     completeRide,
-    addWaypoints
+    addWaypoints,
+    arriveRide
 } from '../controllers/rideController.js';
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.get('/:id', getRideById);
 router.put('/:id', protect, updateRide);
 router.delete('/:id', protect, deleteRide);
 router.put('/:id/complete', protect, completeRide);
+router.put('/:id/arrive', protect, arriveRide);
 router.post('/:id/waypoints', protect, addWaypoints);
 
 export default router;

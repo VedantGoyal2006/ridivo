@@ -86,7 +86,7 @@ passport.use(
                     [name, email, google_id, profile_pic]
                 );
 
-                return done(null, newUser.rows[0]);
+                return done(null, newUser.rows[0]);    //after this req.login() is called automatically then the complete steps are same as in normal email/password login
 
             } catch (err) {
                 console.error('Google OAuth error:', err.message);

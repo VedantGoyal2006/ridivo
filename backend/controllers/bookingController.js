@@ -1,4 +1,7 @@
 import pool from '../config/db.js';
+import twilio from 'twilio';
+import { decryptOTP } from '../utils/otpHelper.js';
+import { refundBookingPayment } from './paymentController.js';
 import {
     createBooking as createBookingInDB,
     getBookingsByTraveler as getBookingsByTravelerFromDB,
@@ -245,7 +248,7 @@ export const cancelBooking = async (req, res) => {
             });
         }
 
-        if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
+        if (!['PENDING', 'CONFIRMED', 'RESERVED', 'PAID'].includes(booking.status)) {
             return res.status(400).json({
                 message: 'This booking cannot be cancelled'
             });
@@ -259,6 +262,11 @@ export const cancelBooking = async (req, res) => {
             cancellation_reason || null
         );
 
+        // Issue automated refund if booking was already paid
+        if (booking.status === 'PAID') {
+            await refundBookingPayment(booking.id);
+        }
+
         // Notify driver in real-time
         await sendNotification(
             booking.driver_id,
@@ -268,11 +276,8 @@ export const cancelBooking = async (req, res) => {
             booking.id
         );
 
-        // TODO: if booking was CONFIRMED and payment made
-        // trigger refund here (Shubham handles this part)
-
         return res.status(200).json({
-            message: 'Booking cancelled successfully',
+            message: 'Booking cancelled successfully. Refund initiated if paid.',
             booking: updated
         });
 
@@ -298,7 +303,7 @@ export const triggerSOS = async (req, res) => {
                     u_pass.name AS passenger_name,
                     r.origin, r.destination, r.departure_time, r.status AS ride_status,
                     u_driver.name AS driver_name, u_driver.id AS driver_id,
-                    v.color AS vehicle_color, v.vehicle_number,
+                    v.color AS vehicle_color, v.vehicle_name, v.vehicle_number,
                     dv.aadhar_number AS driver_aadhar
              FROM bookings b
              JOIN users u_pass ON b.traveler_id = u_pass.id
@@ -321,9 +326,9 @@ export const triggerSOS = async (req, res) => {
             return res.status(403).json({ message: 'Access denied. This is not your booking.' });
         }
 
-        // 3. Verify booking status is CONFIRMED
-        if (booking.booking_status !== 'CONFIRMED') {
-            return res.status(400).json({ message: 'SOS can only be sent for CONFIRMED bookings.' });
+        // 3. Verify booking status is STARTED (only active journeys can trigger SOS!)
+        if (booking.booking_status !== 'STARTED') {
+            return res.status(400).json({ message: 'SOS can only be sent for active (STARTED) journeys.' });
         }
 
         // 4. Fetch the user's emergency contacts
@@ -339,33 +344,50 @@ export const triggerSOS = async (req, res) => {
             });
         }
 
-        // 5. Format the emergency message
-        const formattedDepartureTime = new Date(booking.departure_time).toLocaleString('en-IN', {
-            dateStyle: 'medium',
-            timeStyle: 'short'
-        });
+        // Set sos_active = TRUE on this booking
+        await pool.query(
+            `UPDATE bookings SET sos_active = TRUE, updated_at = NOW() WHERE id = $1`,
+            [booking.booking_id]
+        );
 
+        // 5. Integrate Twilio SMS
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+        
+        const trackingLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/track-sos/${booking.booking_id}`;
+        
         const alertMessage = 
 `🚨 EMERGENCY ALERT FROM RIDIVO 🚨
-
-Passenger: ${booking.passenger_name}
-
+Passenger: ${booking.passenger_name} needs urgent help!
 Driver: ${booking.driver_name}
-Driver Aadhar Card: ${booking.driver_aadhar || 'N/A'}
+Vehicle: ${booking.vehicle_color || ''} ${booking.vehicle_name || ''} (${booking.vehicle_number || ''})
+Trip: ${booking.origin} → ${booking.destination}
+Live Tracking Map: ${trackingLink}`;
 
-Vehicle: ${booking.vehicle_color || 'N/A'}
-Vehicle Number: ${booking.vehicle_number || 'N/A'}
+        let twilioDispatched = false;
 
-Trip:
-${booking.origin} → ${booking.destination}
+        if (twilioSid && twilioToken && twilioPhone && twilioSid !== 'your_twilio_sid') {
+            const client = twilio(twilioSid, twilioToken);
+            for (const contact of contacts) {
+                try {
+                    await client.messages.create({
+                        body: alertMessage,
+                        from: twilioPhone,
+                        to: contact.phone
+                    });
+                } catch (e) {
+                    console.error(`Twilio SMS dispatch failed to ${contact.phone}:`, e.message);
+                }
+            }
+            twilioDispatched = true;
+        }
 
-Ride Started At:
-${formattedDepartureTime}`;
-
-        // 6. Simulate SMS dispatch by logging to console
+        // 6. Simulator fallback
         console.log('\n==================================================');
         console.log(`SOS ALERT TRIGGERED BY USER: ${booking.passenger_name} (ID: ${req.user.id})`);
         console.log(`Active Booking ID: ${booking.booking_id}`);
+        console.log(`SMS Dispatched: ${twilioDispatched ? 'YES (Twilio API)' : 'NO (Sandbox Simulation)'}`);
         console.log('--------------------------------------------------');
         contacts.forEach((contact, idx) => {
             console.log(`[SMS DISPATCH] To: ${contact.phone} (${contact.name} - ${contact.relationship})`);
@@ -376,12 +398,148 @@ ${formattedDepartureTime}`;
         console.log('==================================================\n');
 
         return res.status(200).json({
-            message: `Emergency alert successfully dispatched to ${contacts.length} contact(s).`,
+            message: twilioDispatched 
+                ? `Emergency alert successfully dispatched via Twilio to ${contacts.length} contact(s).`
+                : `Emergency alert simulated successfully to ${contacts.length} contact(s) (Sandbox Mode).`,
             alertText: alertMessage
         });
 
     } catch (err) {
         console.error('triggerSOS error:', err.message);
         return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// GET /api/bookings/:id/sos/public-details (No auth required!)
+export const getPublicSOSDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const bookingQuery = await pool.query(
+            `SELECT b.id AS booking_id, b.status AS booking_status, b.seats_booked,
+                    u_pass.name AS passenger_name,
+                    r.id AS ride_id, r.origin, r.destination, r.origin_lat, r.origin_lng,
+                    r.destination_lat, r.destination_lng, r.departure_time, r.status AS ride_status,
+                    u_driver.name AS driver_name,
+                    v.vehicle_name, v.vehicle_number, v.color AS vehicle_color, v.vehicle_type
+             FROM bookings b
+             JOIN users u_pass ON b.traveler_id = u_pass.id
+             JOIN rides r ON b.ride_id = r.id
+             JOIN users u_driver ON r.driver_id = u_driver.id
+             LEFT JOIN vehicles v ON r.vehicle_id = v.id
+             WHERE b.id = $1`,
+            [id]
+        );
+
+        if (bookingQuery.rows.length === 0) {
+            return res.status(404).json({ message: 'SOS tracking record not found.' });
+        }
+
+        const booking = bookingQuery.rows[0];
+
+        // Security check: Only return details if booking is active (STARTED)
+        if (booking.booking_status !== 'STARTED') {
+            return res.status(400).json({ message: 'Safety tracking is not active for this trip.' });
+        }
+
+        return res.status(200).json({
+            message: 'SOS details retrieved successfully',
+            details: booking
+        });
+
+    } catch (err) {
+        console.error('getPublicSOSDetails error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// POST /api/bookings/:id/verify-otp
+export const verifyBookingOTP = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const { otp } = req.body;
+
+        if (!otp) {
+            return res.status(400).json({ message: 'OTP code is required' });
+        }
+
+        await client.query('BEGIN');
+
+        // 1. Lock and fetch booking details
+        const bookingResult = await client.query(
+            `SELECT b.*, r.driver_id, r.status AS ride_status 
+             FROM bookings b
+             JOIN rides r ON b.ride_id = r.id
+             WHERE b.id = $1 FOR UPDATE`,
+            [id]
+        );
+
+        if (bookingResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Booking request not found' });
+        }
+
+        const booking = bookingResult.rows[0];
+
+        // 2. Security validation: only the driver of this ride can verify the traveler's OTP
+        if (booking.driver_id !== req.user.id) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: 'Access denied. Only the ride creator can verify OTP.' });
+        }
+
+        // 3. Status validation: booking must be CONFIRMED or PAID
+        if (!['CONFIRMED', 'PAID', 'RESERVED'].includes(booking.status)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: `Invalid boarding state. Booking is currently ${booking.status}.` });
+        }
+
+        // 4. Expiration check
+        if (new Date(booking.otp_expires_at) < new Date()) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'OTP has expired. Please request a new verification code.' });
+        }
+
+        // 5. Decrypt and verify matching value
+        const decrypted = decryptOTP(booking.otp_hash);
+        if (decrypted !== otp.toString()) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Incorrect OTP code. Please check and try again.' });
+        }
+
+        // 6. OTP correct: transition booking status to STARTED
+        await client.query(
+            `UPDATE bookings SET status = 'STARTED', updated_at = NOW() WHERE id = $1`,
+            [id]
+        );
+
+        // 7. If the ride is not already ONGOING or ARRIVED/ACTIVE, transition ride status to ONGOING
+        await client.query(
+            `UPDATE rides SET status = 'ONGOING', updated_at = NOW() WHERE id = $1`,
+            [booking.ride_id]
+        );
+
+        await client.query('COMMIT');
+
+        // Send notifications to passenger
+        await sendNotification(
+            booking.traveler_id,
+            "Boarding Verified",
+            "Your OTP has been successfully verified! Enjoy your journey.",
+            "RIDE",
+            booking.id
+        );
+
+        return res.status(200).json({
+            message: 'OTP verified successfully. Boarding complete.',
+            booking_status: 'STARTED'
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('verifyOTP error:', err);
+        return res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 };

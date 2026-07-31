@@ -7,10 +7,13 @@ import {
     updateRide as updateRideInDB,
     cancelRide as cancelRideInDB,
     completeRide as completeRideInDB,
+    arriveAtPickup,
     addWaypoints as addWaypointsInDB,
     hasConfirmedBookings
 } from '../models/rideModel.js';
+import { getBookingsByRide } from '../models/bookingModel.js';
 import { sendNotification } from '../utils/notificationHelper.js';
+import { refundBookingPayment } from './paymentController.js';
 
 // POST /api/rides
 export const createRide = async (req, res) => {
@@ -75,22 +78,30 @@ export const createRide = async (req, res) => {
 // GET /api/rides/search
 export const searchRides = async (req, res) => {
     try {
-        // 1. Get search values from URL
-        const { origin, destination, date, seats } = req.query;
+        const { origin, destination, date, seats, origin_lat, origin_lng, destination_lat, destination_lng } = req.query;
 
-        // 2. Check required fields
         if (!origin || !destination || !date) {
             return res.status(400).json({
                 message: 'origin, destination and date are required'
             });
         }
 
-        // 3. Search rides
+        let latLngs = null;
+        if (origin_lat && origin_lng && destination_lat && destination_lng) {
+            latLngs = {
+                origin_lat: parseFloat(origin_lat),
+                origin_lng: parseFloat(origin_lng),
+                destination_lat: parseFloat(destination_lat),
+                destination_lng: parseFloat(destination_lng)
+            };
+        }
+
         const rides = await searchRidesInDB(
             origin,
             destination,
             date,
-            parseInt(seats) || 1
+            parseInt(seats) || 1,
+            latLngs
         );
 
         return res.status(200).json({
@@ -224,24 +235,42 @@ export const deleteRide = async (req, res) => {
         // 4. Cancel the ride
         const cancelled = await cancelRideInDB(req.params.id);
 
-        // Fetch travelers with confirmed bookings to notify them
+        // Fetch all active bookings for this ride to cancel and refund if paid
         const bookingsResult = await pool.query(
-            `SELECT traveler_id FROM bookings WHERE ride_id = $1 AND status = 'CONFIRMED'`,
+            `SELECT id, traveler_id, status FROM bookings 
+             WHERE ride_id = $1 AND status IN ('PENDING', 'CONFIRMED', 'RESERVED', 'PAID')`,
             [req.params.id]
         );
         
         for (const booking of bookingsResult.rows) {
+            // Update booking to CANCELLED
+            await pool.query(
+                `UPDATE bookings SET 
+                    status = 'CANCELLED', 
+                    cancelled_by = 'DRIVER', 
+                    cancellation_reason = 'Ride cancelled by driver.',
+                    updated_at = NOW() 
+                 WHERE id = $1`,
+                [booking.id]
+            );
+
+            // Refund if paid
+            if (booking.status === 'PAID') {
+                await refundBookingPayment(booking.id);
+            }
+
+            // Notify traveler
             await sendNotification(
                 booking.traveler_id,
-                "Ride Cancelled",
-                `${req.user.name} cancelled the ride from ${ride.origin} to ${ride.destination}.`,
+                "Ride Cancelled by Driver",
+                `${req.user.name} cancelled the ride from ${ride.origin} to ${ride.destination}. Refund initiated if paid.`,
                 "RIDE",
                 ride.id
             );
         }
 
         return res.status(200).json({
-            message: 'Ride cancelled successfully',
+            message: 'Ride cancelled successfully. All passengers notified and refunded.',
             ride: cancelled
         });
 
@@ -345,6 +374,53 @@ export const addWaypoints = async (req, res) => {
 
     } catch (err) {
         console.error('addWaypoints error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// PUT /api/rides/:id/arrive
+export const arriveRide = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const ride = await getRideFromDB(id);
+        if (!ride) {
+            return res.status(404).json({ message: 'Ride not found' });
+        }
+
+        // Only the driver of this ride can mark arrival
+        if (ride.driver_id !== req.user.id) {
+            return res.status(403).json({ message: 'Access denied. You are not the driver of this ride' });
+        }
+
+        // Only ACTIVE or PUBLISHED rides can transition to ARRIVED
+        if (!['ACTIVE', 'PUBLISHED', 'FULL'].includes(ride.status)) {
+            return res.status(400).json({ message: `Cannot mark arrival. Ride is currently ${ride.status}` });
+        }
+
+        const updated = await arriveAtPickup(id);
+
+        // Fetch bookings to notify confirmed passengers
+        const bookings = await getBookingsByRide(id);
+        const confirmedBookings = bookings.filter(b => ['CONFIRMED', 'PAID', 'RESERVED'].includes(b.status));
+
+        for (const booking of confirmedBookings) {
+            await sendNotification(
+                booking.traveler_id,
+                "Driver Arrived!",
+                `Your driver has arrived at the pickup location. Please share your boarding OTP code to start the journey.`,
+                "RIDE",
+                booking.id
+            );
+        }
+
+        return res.status(200).json({
+            message: 'Driver marked as arrived at pickup location. Passengers notified.',
+            ride: updated
+        });
+
+    } catch (err) {
+        console.error('arriveRide error:', err.message);
         return res.status(500).json({ message: 'Server error' });
     }
 };

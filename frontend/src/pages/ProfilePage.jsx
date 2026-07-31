@@ -1,736 +1,670 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getMyProfile, updateMyProfile, getEmergencyContacts, addEmergencyContact, updateEmergencyContact, deleteEmergencyContact } from "../services/userService";
-import axiosInstance from "../utils/axiosInstance";
 import {
-  Calendar,
-  Star,
-  Car,
-  Bike,
-  ShieldCheck,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Edit3,
+  getMyProfile,
+  updateMyProfile,
+  changeMyPassword,
+  getEmergencyContacts,
+  addEmergencyContact,
+  updateEmergencyContact,
+  deleteEmergencyContact
+} from "../services/userService";
+import axiosInstance from "../utils/axiosInstance";
+import { toast } from "react-hot-toast";
+import { Button } from "../components/Button";
+import { Input } from "../components/Input";
+import { Skeleton } from "../components/Skeleton";
+import {
   User,
-  Settings,
-  Bell,
   Mail,
   Phone,
+  Calendar,
+  Lock,
+  ShieldCheck,
+  Clock,
+  AlertTriangle,
   Plus,
+  Car,
+  Bike,
+  Trash2,
+  Edit2,
+  CheckCircle,
+  FileText,
+  Star,
+  Activity,
+  Heart,
+  Upload,
+  ArrowRight,
+  Sparkles,
+  Camera
 } from "lucide-react";
 
-const avatarColors = ["#3B7597", "#093C5D", "#10B981", "#8B5CF6", "#EC4899", "#F59E0B"];
-function getColor(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return avatarColors[Math.abs(hash) % avatarColors.length];
-}
-
-const theme = {
-  bgCard: "#FFFFFF",
-  border: "#E2E8F0",
-  textPrimary: "#093C5D",
-  textSecondary: "#6B7280",
-  textMuted: "#94A3B8",
-  accent: "#3B7597",
-  accentDark: "#093C5D",
-  accentLight: "#EFF6FF",
-  success: "#10B981",
-  successBg: "#EFFDF4",
-  successText: "#10B981",
-  warning: "#F59E0B",
-  warningBg: "#FEF3C7",
-  warningText: "#D97706",
-  danger: "#EF4444",
-  dangerBg: "#FEE2E2",
-};
-
-function Avatar({ name, size = 48, src }) {
-  const initials = name?.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  const bg = getColor(name || "U");
-  if (src) return <img src={src} alt={name} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }} />;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", background: bg,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.35, fontWeight: 700, color: "#fff", flexShrink: 0,
-      fontFamily: "'DM Sans', sans-serif",
-    }}>{initials}</div>
-  );
-}
-
-function StarRating({ rating, size = 16 }) {
-  return (
-    <span style={{ display: "inline-flex", gap: 2 }}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Star key={s} size={size} fill={s <= Math.round(rating) ? "#F59E0B" : "transparent"} color={s <= Math.round(rating) ? "#F59E0B" : theme.textMuted} />
-      ))}
-    </span>
-  );
-}
-
-function EditModal({ user, onClose, onSave }) {
-  const [form, setForm] = useState({ name: user.name, phone: user.phone });
-  const [loading, setLoading] = useState(false);
-
-  const handleSave = async () => {
-    setLoading(true);
-    await onSave(form);
-    setLoading(false);
-  };
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(9, 60, 93, 0.4)", zIndex: 1000,
-      display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
-    }}>
-      <div style={{
-        background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 32,
-        width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h3 style={{ color: theme.textPrimary, fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Sora', sans-serif" }}>Edit Profile</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 20 }}>✕</button>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Full Name</label>
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            style={{
-              width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
-              color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
-              fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Email Address</label>
-          <input
-            value={user.email}
-            disabled
-            style={{
-              width: "100%", background: "#F3F4F6", border: `1px solid ${theme.border}`, borderRadius: 8,
-              color: theme.textMuted, padding: "10px 14px", fontSize: 14, outline: "none",
-              fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box", cursor: "not-allowed",
-            }}
-          />
-          <span style={{ fontSize: 11, color: theme.textMuted, marginTop: 4, display: "block" }}>Email cannot be changed</span>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600", fontFamily: "'DM Sans', sans-serif" }}>Phone Number</label>
-          <input
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            style={{
-              width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
-              color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
-              fontFamily: "'DM Sans', sans-serif", boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-          <button onClick={onClose} style={{
-            flex: 1, padding: "12px 0", borderRadius: 8, border: `1px solid ${theme.border}`,
-            background: "none", color: theme.textSecondary, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: "600"
-          }}>Cancel</button>
-          <button onClick={handleSave} disabled={loading} style={{
-            flex: 1, padding: "12px 0", borderRadius: 8, border: "none",
-            background: loading ? theme.accent : theme.textPrimary, color: "#fff",
-            cursor: loading ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600
-          }}>{loading ? "Saving..." : "Save Changes"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ProfilePage() {
+  const { user: authUser, updateUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { updateUser } = useAuth();
-  
+
+  // Active sub-tab state mapping
   const getInitialTab = () => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    return ["overview", "reviews", "emergency-contacts", "settings"].includes(tab) ? tab : "overview";
+    return ["overview", "vehicles", "emergency", "verification", "security"].includes(tab) ? tab : "overview";
   };
 
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [editOpen, setEditOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
-  // Emergency Contacts state variables
-  const [emergencyContacts, setEmergencyContacts] = useState([]);
-  const [fetchingContacts, setFetchingContacts] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
+  // Modal edit states
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", profile_pic: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // Vehicles Garage state
+  const [vehicles, setVehicles] = useState([]);
+  const [vehicleFormOpen, setVehicleFormOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
+  const [vehicleForm, setVehicleForm] = useState({
+    vehicle_name: "",
+    vehicle_number: "",
+    vehicle_type: "CAR",
+    total_seats: "4",
+    color: "",
+    vehicle_image_url: ""
+  });
+  const [savingVehicle, setSavingVehicle] = useState(false);
+
+  // Emergency Contacts state
+  const [contacts, setContacts] = useState([]);
+  const [contactFormOpen, setContactFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState(null);
   const [contactForm, setContactForm] = useState({ name: "", relationship: "Parent", phone: "" });
-  const [formError, setFormError] = useState("");
-  const [formSaving, setFormSaving] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
 
+  // Password Security state
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [changingPasswordState, setChangingPasswordState] = useState(false);
+
+  // Driver verification application form
+  const [verificationForm, setVerificationForm] = useState({
+    license_number: "",
+    license_expiry: "",
+    license_image_url: "",
+    aadhar_number: "",
+    aadhar_image_url: ""
+  });
+  const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(null); // 'license' | 'aadhar' | 'avatar'
+
+  // Fetch full profile info
+  const loadProfileData = async () => {
+    try {
+      setLoading(true);
+      const data = await getMyProfile();
+      const vehicleRes = await axiosInstance.get("/vehicles");
+      const contactRes = await getEmergencyContacts();
+
+      setUser({
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        phone: data.user.phone || "Not added",
+        avg_rating: parseFloat(data.user.avg_rating) || 4.8,
+        total_rides: data.user.total_rides || 0,
+        is_email_verified: data.user.is_email_verified,
+        created_at: data.user.created_at,
+        profile_pic: data.user.profile_pic || "",
+        is_admin: data.user.is_admin,
+        verification: data.verification_status
+      });
+
+      setVehicles(vehicleRes.data.vehicles || []);
+      setContacts(contactRes.contacts || []);
+      
+      setProfileForm({
+        name: data.user.name,
+        phone: data.user.phone || "",
+        profile_pic: data.user.profile_pic || ""
+      });
+
+    } catch (err) {
+      console.error("Failed to load profile data:", err);
+      toast.error("Failed to retrieve profile records.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProfileData();
+  }, []);
+
+  // Update URL search query on tab switch
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    if (tab && ["overview", "reviews", "emergency-contacts", "settings"].includes(tab)) {
+    if (tab && ["overview", "vehicles", "emergency", "verification", "security"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [location.search]);
 
-  // Fetch emergency contacts when switching to the tab
-  useEffect(() => {
-    if (activeTab === "emergency-contacts") {
-      const fetchContacts = async () => {
-        setFetchingContacts(true);
-        try {
-          const res = await getEmergencyContacts();
-          setEmergencyContacts(res.contacts || []);
-        } catch (err) {
-          console.error("Failed to fetch emergency contacts:", err);
-        } finally {
-          setFetchingContacts(false);
-        }
-      };
-      fetchContacts();
-    }
-  }, [activeTab]);
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    navigate(`/profile?tab=${tabName}`);
+  };
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await getMyProfile();
-        const vehicleRes = await axiosInstance.get("/vehicles");
-        setUser({
-          name: data.user.name,
-          email: data.user.email,
-          phone: data.user.phone || "Not added",
-          avg_rating: parseFloat(data.user.avg_rating) || 0,
-          total_rides: data.user.total_rides || 0,
-          rides_offered: 0,
-          total_saved: 0,
-          is_email_verified: data.user.is_email_verified,
-          created_at: data.user.created_at,
-          profile_pic: data.user.profile_pic || null,
-          verification_status: data.verification_status,
-          vehicles: vehicleRes.data.vehicles || [],
-          reviews: [],
-        });
-      } catch (err) {
-        console.error("Failed to fetch profile:", err);
-        navigate("/login");
-      } finally {
-        setLoading(false);
+  // Profile Picture & Document Upload Simulation (Cloudinary)
+  const handleFileUpload = (e, fieldName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingDoc(fieldName);
+    // Simulate Cloudinary upload delay
+    setTimeout(() => {
+      const mockCloudinaryUrl = `https://res.cloudinary.com/demo/image/upload/w_400,h_400,c_fill/sample.jpg`;
+      
+      if (fieldName === 'avatar') {
+        setProfileForm(prev => ({ ...prev, profile_pic: mockCloudinaryUrl }));
+        toast.success("Profile photo uploaded!");
+      } else if (fieldName === 'license') {
+        setVerificationForm(prev => ({ ...prev, license_image_url: mockCloudinaryUrl }));
+        toast.success("Driving license front image uploaded!");
+      } else if (fieldName === 'aadhar') {
+        setVerificationForm(prev => ({ ...prev, aadhar_image_url: mockCloudinaryUrl }));
+        toast.success("Aadhar card front image uploaded!");
+      } else if (fieldName === 'vehicle') {
+        setVehicleForm(prev => ({ ...prev, vehicle_image_url: mockCloudinaryUrl }));
+        toast.success("Vehicle photo uploaded!");
       }
-    };
-    fetchProfile();
-  }, []);
+      setUploadingDoc(null);
+    }, 1200);
+  };
 
-  const handleSave = async (updated) => {
+  // Submit profile details
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.name.trim()) return toast.error("Name cannot be empty");
+
+    setSavingProfile(true);
     try {
-      const data = await updateMyProfile(updated.name, updated.phone, user.profile_pic);
-      setUser({ ...user, name: data.user.name, phone: data.user.phone });
-      updateUser({ name: data.user.name, phone: data.user.phone });
+      const res = await updateMyProfile(profileForm.name, profileForm.phone, profileForm.profile_pic);
+      setUser(prev => ({
+        ...prev,
+        name: res.user.name,
+        phone: res.user.phone || "Not added",
+        profile_pic: res.user.profile_pic || ""
+      }));
+      updateUser({
+        name: res.user.name,
+        phone: res.user.phone,
+        profile_pic: res.user.profile_pic
+      });
+      setEditProfileOpen(false);
+      toast.success("Profile details updated successfully!");
     } catch (err) {
-      console.error("Failed to update profile:", err);
-      setUser({ ...user, ...updated });
+      toast.error(err.response?.data?.message || "Profile update failed.");
     } finally {
-      setEditOpen(false);
+      setSavingProfile(false);
     }
   };
 
-  const handleSaveContact = async () => {
-    if (!contactForm.name.trim()) {
-      setFormError("Full Name is required.");
-      return;
+  // Password Modification
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return toast.error("New password matching failed.");
     }
-    if (!contactForm.phone.trim()) {
-      setFormError("Phone Number is required.");
-      return;
-    }
-    if (!/^\+?[1-9]\d{7,14}$/.test(contactForm.phone.trim())) {
-      setFormError("Invalid phone number format. Must be 8 to 15 digits (e.g. +919876543210).");
-      return;
+    if (passwordForm.newPassword.length < 6) {
+      return toast.error("New password must be at least 6 characters.");
     }
 
-    setFormSaving(true);
-    setFormError("");
+    setChangingPasswordState(true);
+    try {
+      await changeMyPassword(passwordForm.oldPassword, passwordForm.newPassword);
+      setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+      toast.success("Your password has been changed successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Incorrect current password.");
+    } finally {
+      setChangingPasswordState(false);
+    }
+  };
+
+  // Add/Edit Vehicle
+  const handleVehicleSubmit = async (e) => {
+    e.preventDefault();
+    if (!vehicleForm.vehicle_name || !vehicleForm.vehicle_number || !vehicleForm.total_seats) {
+      return toast.error("Please fill in all required vehicle details.");
+    }
+
+    setSavingVehicle(true);
+    try {
+      if (editingVehicle) {
+        // Edit Mode
+        const res = await axiosInstance.put(`/vehicles/${editingVehicle.id}`, vehicleForm);
+        setVehicles(prev => prev.map(v => v.id === editingVehicle.id ? res.data.vehicle : v));
+        toast.success("Vehicle records updated successfully!");
+      } else {
+        // Add Mode
+        const res = await axiosInstance.post("/vehicles", vehicleForm);
+        setVehicles(prev => [res.data.vehicle, ...prev]);
+        toast.success("Vehicle registered to your garage!");
+      }
+      setVehicleFormOpen(false);
+      setEditingVehicle(null);
+      setVehicleForm({
+        vehicle_name: "",
+        vehicle_number: "",
+        vehicle_type: "CAR",
+        total_seats: "4",
+        color: "",
+        vehicle_image_url: ""
+      });
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save vehicle details.");
+    } finally {
+      setSavingVehicle(false);
+    }
+  };
+
+  // Toggle active vehicle
+  const handleToggleActiveVehicle = async (vehicleId) => {
+    try {
+      const res = await axiosInstance.put(`/vehicles/${vehicleId}/active`);
+      setVehicles(prev => prev.map(v => v.id === vehicleId ? res.data.vehicle : { ...v, is_active: false }));
+      toast.success("Selected vehicle is now marked as active!");
+    } catch (err) {
+      toast.error("Failed to select active vehicle.");
+    }
+  };
+
+  // Remove Vehicle
+  const handleRemoveVehicle = async (vehicleId) => {
+    if (!window.confirm("Are you sure you want to remove this vehicle from your garage?")) return;
+
+    try {
+      await axiosInstance.delete(`/vehicles/${vehicleId}`);
+      setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+      toast.success("Vehicle deleted successfully.");
+    } catch (err) {
+      toast.error("Failed to remove vehicle.");
+    }
+  };
+
+  // Emergency Contacts Add/Edit
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    if (!contactForm.name.trim() || !contactForm.phone.trim()) {
+      return toast.error("Contact name and phone are required.");
+    }
+
+    setSavingContact(true);
     try {
       if (editingContact) {
         const res = await updateEmergencyContact(editingContact.id, contactForm);
-        setEmergencyContacts(emergencyContacts.map((c) => (c.id === editingContact.id ? res.contact : c)));
+        setContacts(prev => prev.map(c => c.id === editingContact.id ? res.contact : c));
+        toast.success("Contact details updated!");
       } else {
+        if (contacts.length >= 5) return toast.error("Maximum 5 contacts allowed.");
         const res = await addEmergencyContact(contactForm);
-        setEmergencyContacts([...emergencyContacts, res.contact]);
+        setContacts(prev => [...prev, res.contact]);
+        toast.success("Emergency contact added successfully!");
       }
-      setFormOpen(false);
+      setContactFormOpen(false);
+      setEditingContact(null);
+      setContactForm({ name: "", relationship: "Parent", phone: "" });
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to save contact.");
+      toast.error(err.response?.data?.message || "Failed to save contact.");
     } finally {
-      setFormSaving(false);
+      setSavingContact(false);
     }
   };
 
+  // Delete Contact
   const handleDeleteContact = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this emergency contact?")) return;
+    if (!window.confirm("Delete this emergency contact?")) return;
     try {
       await deleteEmergencyContact(id);
-      setEmergencyContacts(emergencyContacts.filter((c) => c.id !== id));
+      setContacts(prev => prev.filter(c => c.id !== id));
+      toast.success("Emergency contact deleted.");
     } catch (err) {
-      alert("Failed to delete contact.");
+      toast.error("Failed to delete contact.");
     }
   };
 
-  const memberSince = user
-    ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
-    : "";
+  // Submit Driver Verification Details
+  const handleApplyVerification = async (e) => {
+    e.preventDefault();
+    if (!verificationForm.license_number || !verificationForm.license_expiry || !verificationForm.aadhar_number) {
+      return toast.error("All document fields are required.");
+    }
 
-  const tabs = user
-    ? [
-        { id: "overview", label: "Overview" },
-        { id: "reviews", label: `Reviews (${user.reviews.length})` },
-        { id: "emergency-contacts", label: "Emergency Contacts" },
-        { id: "settings", label: "Settings" },
-      ]
-    : [];
+    setSubmittingVerification(true);
+    try {
+      const res = await axiosInstance.post("/verification/apply", verificationForm);
+      setUser(prev => ({ ...prev, verification: res.data.verification }));
+      toast.success("Verification request submitted for approval.");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to submit verification request.");
+    } finally {
+      setSubmittingVerification(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 0" }}>
-        <div style={{ color: theme.accent, fontFamily: "'DM Sans', sans-serif", fontSize: "18px" }}>
-          Loading profile...
+      <div className="space-y-6 max-w-4xl mx-auto py-8">
+        <Skeleton variant="rect" className="h-44 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton variant="rect" className="h-64" />
+          <Skeleton variant="rect" className="h-64 md:col-span-2" />
         </div>
       </div>
     );
   }
 
+  const memberSinceStr = user
+    ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+    : "";
+
   return (
-    <>
-      <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+      
+      {/* ── PROFILE HERO CARD ── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-600 to-indigo-900 text-white p-6 md:p-8 shadow-xl">
+        <div className="absolute top-0 right-0 w-44 h-44 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10" />
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary-400/10 rounded-full blur-xl -ml-6 -mb-6" />
 
-      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-        {/* Profile Hero Card */}
-        <div style={{
-          background: `linear-gradient(135deg, ${theme.accentLight} 0%, #E0F2FE 100%)`,
-          border: `1px solid ${theme.border}`,
-          borderRadius: "20px", padding: "32px", marginBottom: "28px",
-          position: "relative", overflow: "hidden",
-          boxShadow: "0 10px 30px rgba(9, 60, 93, 0.02)"
-        }}>
-          <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px", background: "radial-gradient(circle, rgba(9,60,93,0.06), transparent)", borderRadius: "50%" }} />
-          
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", position: "relative" }}>
-            <div style={{ position: "relative" }}>
-              <Avatar name={user.name} size={84} src={user.profile_pic} />
-              <button 
-                onClick={() => navigate('/edit-profile')}
-                style={{
-                  position: "absolute", bottom: 0, right: 0, width: "28px", height: "28px",
-                  backgroundColor: theme.textPrimary, borderRadius: "50%", display: "flex",
-                  alignItems: "center", justifyContent: "center", cursor: "pointer", border: `2px solid ${theme.bgCard}`,
-                  color: "white"
-                }}
-              >
-                <Edit3 size={12} />
-              </button>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "24px", fontWeight: "800", color: theme.textPrimary, fontFamily: "'Sora', sans-serif", marginBottom: "6px" }}>{user.name}</div>
-              
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: "5px",
-                  backgroundColor: user.is_email_verified ? theme.successBg : theme.dangerBg,
-                  borderRadius: "20px", padding: "4px 12px", fontSize: "11px", fontWeight: "700",
-                  color: user.is_email_verified ? theme.success : theme.danger,
-                  border: `1px solid ${user.is_email_verified ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)"}`
-                }}>
-                  {user.is_email_verified ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                  {user.is_email_verified ? "Verified User" : "Unverified"}
-                </div>
-                
-                <div style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#fff", border: `1px solid ${theme.border}`, borderRadius: "20px", padding: "4px 12px", fontSize: "11px", color: theme.textSecondary, fontWeight: "600" }}>
-                  <Calendar size={12} /> Member since {memberSince}
-                </div>
+        <div className="relative flex flex-col sm:flex-row items-center gap-6">
+          {/* Avatar Upload */}
+          <div className="relative group">
+            {user.profile_pic ? (
+              <img src={user.profile_pic} alt={user.name} className="w-24 h-24 rounded-2xl object-cover border-4 border-white/20" />
+            ) : (
+              <div className="w-24 h-24 rounded-2xl bg-white/10 flex items-center justify-center font-bold text-3xl border-4 border-white/20">
+                {user.name[0]}
               </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <StarRating rating={user.avg_rating} size={14} />
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "#F59E0B" }}>{user.avg_rating}</span>
-                <span style={{ fontSize: "12px", color: theme.textSecondary }}>({user.reviews.length} reviews)</span>
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                <button 
-                  onClick={() => navigate('/edit-profile')}
-                  style={{
-                    padding: "10px 20px", backgroundColor: theme.textPrimary, color: "white",
-                    border: "none", borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
-                    display: "flex", alignItems: "center", gap: "6px"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#07304b"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.textPrimary}
-                >
-                  <Edit3 size={14} /> Edit Profile
-                </button>
-
-                {user.verification_status === null && (
-                  <button 
-                    onClick={() => navigate("/verify")}
-                    style={{
-                      padding: "10px 20px", backgroundColor: "white", color: theme.textPrimary,
-                      border: `1px solid ${theme.border}`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                      cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s"
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.textPrimary; e.currentTarget.style.backgroundColor = theme.accentLight; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; }}
-                  >
-                    🛡️ Become a Driver
-                  </button>
-                )}
-                {user.verification_status?.status === "PENDING" && (
-                  <div style={{
-                    padding: "10px 20px", backgroundColor: theme.warningBg, color: theme.warningText,
-                    border: `1px solid rgba(245, 158, 11, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                    display: "flex", alignItems: "center", gap: "6px"
-                  }}>
-                    <Clock size={14} /> Verification Pending
-                  </div>
-                )}
-                {user.verification_status?.status === "APPROVED" && (
-                  <div style={{
-                    padding: "10px 20px", backgroundColor: theme.successBg, color: theme.success,
-                    border: `1px solid rgba(16, 185, 129, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                    display: "flex", alignItems: "center", gap: "6px"
-                  }}>
-                    <ShieldCheck size={14} /> Verified Driver
-                  </div>
-                )}
-                {user.verification_status?.status === "REJECTED" && (
-                  <button 
-                    onClick={() => navigate("/verify")}
-                    style={{
-                      padding: "10px 20px", backgroundColor: theme.dangerBg, color: theme.danger,
-                      border: `1px solid rgba(239, 68, 68, 0.2)`, borderRadius: "10px", fontSize: "13px", fontWeight: "700",
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
-                    }}
-                  >
-                    <AlertTriangle size={14} /> Reapply Verification
-                  </button>
-                )}
-              </div>
-            </div>
+            )}
+            <label className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+              {uploadingDoc === 'avatar' ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+              ) : (
+                <Camera className="w-6 h-6 text-white" />
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'avatar')} />
+            </label>
           </div>
-        </div>
 
-        {/* Stats Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "28px" }}>
-          {[
-            { num: user.total_rides, label: "Rides Taken", sub: "↑ 3 this month" },
-            { num: user.rides_offered, label: "Rides Offered", sub: "↑ 1 this month" },
-            { num: `₹${user.total_saved}`, label: "Total Saved", sub: "vs solo travel" },
-          ].map((stat, i) => (
-            <div key={i} style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
-              <div style={{ fontSize: "28px", fontWeight: "800", color: theme.textPrimary, marginBottom: "4px", fontFamily: "'Sora', sans-serif" }}>{stat.num}</div>
-              <div style={{ fontSize: "13px", color: theme.textSecondary, fontWeight: "600" }}>{stat.label}</div>
-              <div style={{ fontSize: "11px", color: theme.accent, marginTop: "4px", fontWeight: "500" }}>{stat.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Navigation Tabs */}
-        <div style={{ display: "flex", gap: "4px", backgroundColor: "rgba(9,60,93,0.03)", padding: "4px", borderRadius: "12px", border: `1px solid ${theme.border}`, marginBottom: "28px", width: "fit-content" }}>
-          {tabs.map((t) => (
-            <div 
-              key={t.id} 
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                padding: "8px 20px", borderRadius: "8px", fontSize: "13.5px", fontWeight: "600", cursor: "pointer",
-                backgroundColor: activeTab === t.id ? theme.bgCard : "transparent",
-                color: activeTab === t.id ? theme.textPrimary : theme.textSecondary,
-                transition: "all 0.2s",
-                boxShadow: activeTab === t.id ? "0 4px 10px rgba(9, 60, 93, 0.03)" : "none"
-              }}
-            >
-              {t.label}
-            </div>
-          ))}
-        </div>
-
-        {/* Tab content */}
-        {activeTab === "overview" && (
-          <>
-            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Personal Information</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-                {[
-                  { label: "Full Name", value: user.name, icon: User },
-                  { label: "Email Address", value: user.email, icon: Mail },
-                  { label: "Phone Number", value: user.phone, icon: Phone },
-                  { label: "Member Since", value: memberSince, icon: Calendar },
-                ].map((item, i) => {
-                  const IconComp = item.icon;
-                  return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", border: `1px solid ${theme.border}`, borderRadius: "10px", backgroundColor: "#F9FAFB" }}>
-                      <IconComp size={18} style={{ color: theme.textSecondary }} />
-                      <div>
-                        <div style={{ fontSize: "11px", color: theme.textSecondary, fontWeight: "600", textTransform: "uppercase" }}>{item.label}</div>
-                        <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "700", marginTop: "2px" }}>{item.value}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Verification Status Card */}
-            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Driver Verification</div>
-              {user.verification_status === null && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ color: theme.textPrimary, fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Not Applied</div>
-                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>Apply to become a verified driver and start offering rides</div>
-                  </div>
-                  <button onClick={() => navigate("/verify")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Apply Now</button>
-                </div>
-              )}
-              {user.verification_status?.status === "PENDING" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.warningBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.warningText }}><Clock size={20} /></div>
-                  <div>
-                    <div style={{ color: theme.warningText, fontSize: 14, fontWeight: 700 }}>Verification Pending</div>
-                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>Admin is reviewing your documents</div>
-                  </div>
-                </div>
-              )}
-              {user.verification_status?.status === "APPROVED" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.successBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.success }}><ShieldCheck size={20} /></div>
-                  <div>
-                    <div style={{ color: theme.success, fontSize: 14, fontWeight: 700 }}>Verified Driver</div>
-                    <div style={{ color: theme.textSecondary, fontSize: 12 }}>You can now offer rides on Ridivo</div>
-                  </div>
-                </div>
-              )}
-              {user.verification_status?.status === "REJECTED" && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: theme.dangerBg, display: "flex", alignItems: "center", justifyContent: "center", color: theme.danger }}><AlertTriangle size={20} /></div>
-                    <div>
-                      <div style={{ color: theme.danger, fontSize: 14, fontWeight: 700 }}>Verification Rejected</div>
-                      <div style={{ color: theme.textSecondary, fontSize: 12 }}>{user.verification_status.rejection_reason || "Please reapply with correct documents"}</div>
-                    </div>
-                  </div>
-                  <button onClick={() => navigate("/verify")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reapply</button>
-                </div>
-              )}
+          {/* User Details */}
+          <div className="text-center sm:text-left flex-1 space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight">{user.name}</h2>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+              <span className="text-[11px] font-extrabold tracking-wide uppercase px-3 py-1 rounded-full bg-white/20 flex items-center gap-1.5">
+                {user.is_email_verified ? <CheckCircle className="w-3.5 h-3.5" /> : null}
+                {user.is_email_verified ? "Verified User" : "Unverified"}
+              </span>
+              <span className="text-[11px] font-semibold text-slate-200 px-3 py-1 rounded-full bg-white/10 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" /> Joined {memberSinceStr}
+              </span>
             </div>
             
-            {/* Vehicles section */}
-            {user.verification_status?.status === "APPROVED" && (
-              <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                  <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px" }}>My Vehicles</div>
-                  <button onClick={() => navigate("/edit-profile?tab=vehicles")} style={{ padding: "8px 14px", backgroundColor: theme.accentLight, color: theme.textPrimary, border: `1px solid rgba(9, 60, 93, 0.1)`, borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Plus size={14} /> Add Vehicle
-                  </button>
-                </div>
+            {/* Driver Badge */}
+            <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+              {!user.verification ? (
+                <span className="text-xs bg-slate-800/40 text-slate-300 px-3 py-1 rounded-lg border border-slate-700/30">Passenger Only</span>
+              ) : user.verification.status === 'APPROVED' ? (
+                <span className="text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-lg border border-emerald-500/30 font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-4 h-4" /> Verified Driver
+                </span>
+              ) : user.verification.status === 'PENDING' ? (
+                <span className="text-xs bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-lg border border-yellow-500/30 font-semibold flex items-center gap-1">
+                  <Clock className="w-4 h-4 animate-pulse" /> Document Review Pending
+                </span>
+              ) : (
+                <span className="text-xs bg-red-500/20 text-red-300 px-3 py-1 rounded-lg border border-red-500/30 font-semibold flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" /> Verification Rejected
+                </span>
+              )}
+            </div>
+          </div>
 
-                {user.vehicles && user.vehicles.length > 0 ? (
-                  user.vehicles.map((v) => (
-                    <div key={v.id} style={{
-                      display: "flex", alignItems: "center", gap: "14px",
-                      padding: "14px 18px", borderRadius: "12px", marginBottom: "10px",
-                      backgroundColor: "#F9FAFB",
-                      border: `1px solid ${v.is_active ? "rgba(9, 60, 93, 0.2)" : theme.border}`,
-                    }}>
-                      <div style={{ width: "44px", height: "44px", borderRadius: "10px", backgroundColor: theme.accentLight, display: "flex", alignItems: "center", justifyContent: "center", color: theme.textPrimary }}>
-                        {v.vehicle_type === "BIKE" ? <Bike size={22} /> : <Car size={22} />}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ color: theme.textPrimary, fontSize: "14px", fontWeight: "700", marginBottom: "3px" }}>
-                          {v.vehicle_name}
-                          {v.is_active && (
-                            <span style={{ marginLeft: "8px", fontSize: "10px", backgroundColor: "rgba(16, 185, 129, 0.1)", color: theme.success, padding: "2px 8px", borderRadius: "100px", fontWeight: "700" }}>
-                              ACTIVE
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ color: theme.textSecondary, fontSize: "12px" }}>
-                          {v.vehicle_number} · {v.vehicle_type} · {v.total_seats} seats {v.color ? `· ${v.color}` : ""}
-                        </div>
-                      </div>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setEditProfileOpen(true)}>
+              <Edit2 className="w-4 h-4" /> Edit Details
+            </Button>
+          </div>
+        </div>
+
+        {/* Floating statistics bar */}
+        <div className="grid grid-cols-3 bg-white/10 rounded-2xl mt-8 p-4 text-center divide-x divide-white/10">
+          <div>
+            <h4 className="text-xl font-bold tracking-tight">{user.total_rides}</h4>
+            <p className="text-[10px] text-slate-200 mt-0.5 font-medium uppercase tracking-wider">Total Trips</p>
+          </div>
+          <div>
+            <h4 className="text-xl font-bold tracking-tight">
+              {vehicles.length}
+            </h4>
+            <p className="text-[10px] text-slate-200 mt-0.5 font-medium uppercase tracking-wider">Vehicles Garage</p>
+          </div>
+          <div>
+            <h4 className="text-xl font-bold tracking-tight flex items-center justify-center gap-1">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" /> {user.avg_rating}
+            </h4>
+            <p className="text-[10px] text-slate-200 mt-0.5 font-medium uppercase tracking-wider">Rating</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SUB-TABS NAVIGATION ── */}
+      <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar gap-6">
+        {[
+          { id: "overview", label: "Personal Info" },
+          { id: "vehicles", label: "My Garage (Vehicles)" },
+          { id: "emergency", label: "Emergency Contacts" },
+          { id: "verification", label: "Driver Verification" },
+          { id: "security", label: "Security & Logins" }
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => handleTabChange(t.id)}
+            className={`py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap focus:outline-none ${
+              activeTab === t.id
+                ? 'border-primary-600 text-primary-600 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── TAB CONTENT ── */}
+      <div className="space-y-6">
+
+        {/* 1. OVERVIEW TAB */}
+        {activeTab === "overview" && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Personal Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { label: "Full Name", value: user.name, icon: User },
+                { label: "Email Address", value: user.email, icon: Mail },
+                { label: "Phone Number", value: user.phone, icon: Phone },
+                { label: "Language", value: "English", icon: Sparkles }
+              ].map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <div key={idx} className="flex items-center gap-3.5 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                    <div className="w-10 h-10 bg-white border border-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                      <Icon className="w-5 h-5" />
                     </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: "center", padding: "32px 0", color: theme.textSecondary }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '8px' }}>
-                      <Car size={36} />
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{item.label}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">{item.value}</p>
                     </div>
-                    <div style={{ fontSize: "13px", marginBottom: "12px" }}>No vehicles added yet</div>
-                    <button onClick={() => navigate("/edit-profile?tab=vehicles")} style={{ padding: "8px 16px", backgroundColor: theme.textPrimary, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                      Add Your First Vehicle
-                    </button>
                   </div>
-                )}
-              </div>
-            )}
-          </>
+                );
+              })}
+            </div>
+          </div>
         )}
 
-        {/* Tab: Emergency Contacts */}
-        {activeTab === "emergency-contacts" && (
-          <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
+        {/* 2. VEHICLES TAB */}
+        {activeTab === "vehicles" && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
               <div>
-                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px" }}>Emergency Contacts</div>
-                <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px" }}>Manage up to 5 trusted contacts for instant SOS ride safety alerts.</div>
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">My Garage</h3>
+                <p className="text-xs text-slate-500 mt-1">Manage vehicles you use to offer rides and cost-share.</p>
               </div>
-              {emergencyContacts.length < 5 && (
-                <button
-                  onClick={() => {
-                    setEditingContact(null);
-                    setContactForm({ name: "", relationship: "Parent", phone: "" });
-                    setFormError("");
-                    setFormOpen(true);
-                  }}
-                  style={{
-                    padding: "10px 16px",
-                    backgroundColor: theme.textPrimary,
-                    color: "white",
-                    border: "none",
-                    borderRadius: "10px",
-                    fontSize: "13px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    fontFamily: "'DM Sans', sans-serif",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#07304b"}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.textPrimary}
-                >
-                  <Plus size={14} /> Add Contact
-                </button>
+              
+              {user.verification?.status === 'APPROVED' ? (
+                <Button variant="primary" size="sm" onClick={() => { setEditingVehicle(null); setVehicleFormOpen(true); }}>
+                  <Plus className="w-4 h-4" /> Add Vehicle
+                </Button>
+              ) : (
+                <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1.5 rounded-lg border border-slate-200 font-semibold">
+                  Approved Verification Required
+                </span>
               )}
             </div>
 
-            {fetchingContacts ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>
-                Loading contacts...
-              </div>
-            ) : emergencyContacts.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px 20px", color: theme.textSecondary, border: `1px dashed ${theme.border}`, borderRadius: "12px", backgroundColor: "#F9FAFB" }}>
-                <div style={{ fontSize: "32px", marginBottom: "12px" }}>🛡️</div>
-                <div style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, marginBottom: "4px", fontFamily: "'Sora', sans-serif" }}>No Emergency Contacts Saved</div>
-                <div style={{ fontSize: "12.5px", maxWidth: "340px", margin: "0 auto 16px", lineHeight: "1.5" }}>Add trusted friends, family, or relatives so we can alert them instantly in case of an emergency.</div>
-                <button
-                  onClick={() => {
-                    setEditingContact(null);
-                    setContactForm({ name: "", relationship: "Parent", phone: "" });
-                    setFormError("");
-                    setFormOpen(true);
-                  }}
-                  style={{
-                    padding: "8px 16px",
-                    backgroundColor: theme.textPrimary,
-                    color: "white",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "12.5px",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                    fontFamily: "'DM Sans', sans-serif"
-                  }}
-                >
-                  Add First Contact
-                </button>
+            {/* Vehicles Listing */}
+            {vehicles.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center shadow-sm">
+                <Car className="w-12 h-12 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-800 mt-4">Your Garage is Empty</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  Verify your driver profile and register your car or bike to offer seats and start splitting road costs!
+                </p>
+                {user.verification?.status === 'APPROVED' && (
+                  <Button variant="primary" size="sm" className="mt-4" onClick={() => setVehicleFormOpen(true)}>
+                    Register Vehicle
+                  </Button>
+                )}
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
-                {emergencyContacts.map((contact) => (
-                  <div key={contact.id} style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "16px 20px",
-                    backgroundColor: "#F9FAFB",
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: "12px",
-                    transition: "all 0.2s"
-                  }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.boxShadow = "0 4px 12px rgba(9, 60, 93, 0.02)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.boxShadow = "none"; }}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vehicles.map((v) => (
+                  <div
+                    key={v.id}
+                    className={`bg-white border rounded-3xl p-5 shadow-sm transition-all flex flex-col justify-between ${
+                      v.is_active ? 'border-primary-500 ring-2 ring-primary-100' : 'border-slate-200'
+                    }`}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                      <div style={{
-                        width: "42px", height: "42px", borderRadius: "50%",
-                        backgroundColor: theme.accentLight, display: "flex",
-                        alignItems: "center", justifyContent: "center", color: theme.textPrimary,
-                        fontSize: "16px", fontWeight: "700", fontFamily: "'DM Sans', sans-serif"
-                      }}>
-                        {contact.name.charAt(0).toUpperCase()}
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                            {v.vehicle_type === 'BIKE' ? <Bike className="w-6 h-6" /> : <Car className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                              {v.vehicle_name}
+                              {v.is_active && (
+                                <span className="bg-emerald-500/10 text-emerald-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                                  ACTIVE
+                                </span>
+                              )}
+                            </h4>
+                            <p className="text-xs font-semibold text-primary-600 mt-0.5">{v.vehicle_number}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { setEditingVehicle(v); setVehicleForm(v); setVehicleFormOpen(true); }}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveVehicle(v.id)}
+                            className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-4 text-[11px] font-semibold text-slate-500">
+                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl">Type: <span className="text-slate-800">{v.vehicle_type}</span></div>
+                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl">Seats: <span className="text-slate-800">{v.total_seats} Seats</span></div>
+                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl">Color: <span className="text-slate-800">{v.color || 'N/A'}</span></div>
+                        <div className="bg-slate-50 px-3 py-1.5 rounded-xl">Active: <span className="text-slate-800">{v.is_active ? 'Yes' : 'No'}</span></div>
+                      </div>
+                    </div>
+
+                    {!v.is_active && (
+                      <Button
+                        variant="accent"
+                        size="sm"
+                        className="w-full mt-4 text-xs font-bold"
+                        onClick={() => handleToggleActiveVehicle(v.id)}
+                      >
+                        Set as Active Ride Vehicle
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. EMERGENCY CONTACTS TAB */}
+        {activeTab === "emergency" && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">Emergency Contacts</h3>
+                <p className="text-xs text-slate-500 mt-1">Manage up to 5 contacts. In emergencies, tapping SOS triggers SMS details automatically.</p>
+              </div>
+              {contacts.length < 5 && (
+                <Button variant="primary" size="sm" onClick={() => { setEditingContact(null); setContactForm({ name: "", relationship: "Parent", phone: "" }); setContactFormOpen(true); }}>
+                  <Plus className="w-4 h-4" /> Add Contact
+                </Button>
+              )}
+            </div>
+
+            {contacts.length === 0 ? (
+              <div className="text-center py-10">
+                <Heart className="w-12 h-12 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-bold text-slate-800 mt-4">No Emergency Contacts Defined</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                  For your safety, we strongly recommend adding emergency contacts.
+                </p>
+                <Button variant="secondary" size="sm" className="mt-4" onClick={() => setContactFormOpen(true)}>
+                  Add Emergency Contact
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {contacts.map((c) => (
+                  <div key={c.id} className="flex justify-between items-center py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center">
+                        <Heart className="w-5 h-5 fill-red-500" />
                       </div>
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "14.5px", fontWeight: "700", color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif" }}>{contact.name}</span>
-                          <span style={{
-                            fontSize: "10.5px",
-                            fontWeight: "700",
-                            backgroundColor: "rgba(9, 60, 93, 0.06)",
-                            color: theme.textPrimary,
-                            padding: "2px 8px",
-                            borderRadius: "100px",
-                            textTransform: "uppercase"
-                          }}>{contact.relationship}</span>
-                        </div>
-                        <div style={{ fontSize: "12.5px", color: theme.textSecondary, marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
-                          <Phone size={11} /> {contact.phone}
-                        </div>
+                        <h4 className="text-sm font-bold text-slate-800">{c.name}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">{c.relationship} · <span className="font-semibold text-slate-700">{c.phone}</span></p>
                       </div>
                     </div>
-
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => {
-                          setEditingContact(contact);
-                          setContactForm({ name: contact.name, relationship: contact.relationship, phone: contact.phone });
-                          setFormError("");
-                          setFormOpen(true);
-                        }}
-                        style={{
-                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
-                          backgroundColor: "white", color: theme.textSecondary, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.color = theme.textPrimary; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.textSecondary; }}
+                        onClick={() => { setEditingContact(c); setContactForm(c); setContactFormOpen(true); }}
+                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
                       >
-                        <Edit3 size={14} />
+                        <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteContact(contact.id)}
-                        style={{
-                          width: "32px", height: "32px", borderRadius: "8px", border: `1px solid ${theme.border}`,
-                          backgroundColor: "white", color: theme.danger, cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s"
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.danger; e.currentTarget.style.backgroundColor = theme.dangerBg; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.backgroundColor = "white"; }}
+                        onClick={() => handleDeleteContact(c.id)}
+                        className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
                       >
-                        ✕
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -740,177 +674,369 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Tab: Reviews */}
-        {activeTab === "reviews" && (
-          <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px" }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Reviews From Co-Passengers</div>
-            {user.reviews.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: theme.textSecondary }}>
-                <div style={{ display: 'flex', justifyContent: 'center', color: '#94A3B8', marginBottom: '12px' }}>
-                  <Star size={40} />
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>No reviews yet</div>
-                <div style={{ fontSize: 12 }}>Complete rides to receive reviews from co-passengers</div>
-              </div>
-            ) : (
-              user.reviews.map((r) => (
-                <div key={r.id} style={{ padding: "16px 0", borderBottom: `1px solid ${theme.border}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-                    <Avatar name={r.reviewer} size={38} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "14px", fontWeight: "600", color: theme.textPrimary }}>{r.reviewer}</div>
-                      <div style={{ fontSize: "11px", color: theme.textSecondary, marginTop: "2px" }}>{new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
-                    </div>
-                    <StarRating rating={r.rating} />
+        {/* 4. DRIVER VERIFICATION TAB */}
+        {activeTab === "verification" && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Driver Verification Program</h3>
+            
+            {/* Timeline Stepper for reviews */}
+            {user.verification && (
+              <div className="bg-slate-50 rounded-2xl p-4 flex flex-col md:flex-row justify-between gap-4 md:items-center border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${
+                    user.verification.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' :
+                    user.verification.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'
+                  }`}>
+                    {user.verification.status === 'APPROVED' ? '✓' : user.verification.status === 'REJECTED' ? '✗' : '⌛'}
                   </div>
-                  <div style={{ fontSize: "13px", color: theme.textSecondary, lineLineHeight: "1.5" }}>"{r.comment}"</div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Verification Timeline</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Status: <span className="font-bold uppercase">{user.verification.status}</span></p>
+                  </div>
                 </div>
-              ))
+
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 flex-wrap">
+                  <span className="text-primary-600">Submitted</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span className={user.verification.status !== 'PENDING' ? 'text-primary-600' : 'text-yellow-600'}>Reviewing</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span className={
+                    user.verification.status === 'APPROVED' ? 'text-emerald-600 font-bold' :
+                    user.verification.status === 'REJECTED' ? 'text-red-600 font-bold' : 'text-slate-400'
+                  }>Final Status</span>
+                </div>
+              </div>
+            )}
+
+            {/* State Actions */}
+            {user.verification?.status === 'APPROVED' && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-2xl flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="text-sm font-bold">Approved Driver Onboarding</h4>
+                  <p className="text-xs text-emerald-700/90 mt-1 leading-relaxed">
+                    You have successfully passed the identity audit checks. You can now publish intercity ride slots. Remember to select an active vehicle from your garage profile.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {user.verification?.status === 'REJECTED' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-red-50 border border-red-100 text-red-800 rounded-2xl flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-bold">Identity Verification Rejected</h4>
+                    <p className="text-xs text-red-700/90 mt-1 leading-relaxed">
+                      Reason: <span className="font-bold">{user.verification.rejection_reason || "Invalid document image quality."}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Please review your document parameters below and re-submit application details:</p>
+              </div>
+            )}
+
+            {(!user.verification || user.verification.status === 'REJECTED') && (
+              <form onSubmit={handleApplyVerification} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Driving License Number"
+                    placeholder="DL-XXXXXXXXXXXXX"
+                    required
+                    value={verificationForm.license_number}
+                    onChange={(e) => setVerificationForm(prev => ({ ...prev, license_number: e.target.value }))}
+                  />
+                  <Input
+                    label="License Expiry Date"
+                    type="date"
+                    required
+                    value={verificationForm.license_expiry}
+                    onChange={(e) => setVerificationForm(prev => ({ ...prev, license_expiry: e.target.value }))}
+                  />
+                </div>
+
+                <Input
+                  label="Aadhar Number (Exactly 12 digits)"
+                  placeholder="123456789012"
+                  required
+                  maxLength={12}
+                  value={verificationForm.aadhar_number}
+                  onChange={(e) => setVerificationForm(prev => ({ ...prev, aadhar_number: e.target.value.replace(/\D/g, '') }))}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {/* Driving License Image Upload */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Driving License Front Photo</label>
+                    <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-primary-500 transition-colors relative">
+                      {verificationForm.license_image_url ? (
+                        <div className="space-y-2">
+                          <img src={verificationForm.license_image_url} alt="License Front" className="h-28 mx-auto rounded-lg object-cover" />
+                          <p className="text-[10px] text-slate-500">Document selected.</p>
+                        </div>
+                      ) : (
+                        <div className="py-4">
+                          <Upload className="w-8 h-8 text-slate-400 mx-auto" />
+                          <p className="text-xs text-slate-500 mt-2">Drag files or click to upload</p>
+                        </div>
+                      )}
+                      <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'license')} />
+                      {uploadingDoc === 'license' && <div className="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary-600 border-t-transparent animate-spin rounded-full" /></div>}
+                    </div>
+                  </div>
+
+                  {/* Aadhar Image Upload */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Aadhar Card Front Photo</label>
+                    <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-primary-500 transition-colors relative">
+                      {verificationForm.aadhar_image_url ? (
+                        <div className="space-y-2">
+                          <img src={verificationForm.aadhar_image_url} alt="Aadhar Front" className="h-28 mx-auto rounded-lg object-cover" />
+                          <p className="text-[10px] text-slate-500">Document selected.</p>
+                        </div>
+                      ) : (
+                        <div className="py-4">
+                          <Upload className="w-8 h-8 text-slate-400 mx-auto" />
+                          <p className="text-xs text-slate-500 mt-2">Drag files or click to upload</p>
+                        </div>
+                      )}
+                      <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'aadhar')} />
+                      {uploadingDoc === 'aadhar' && <div className="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary-600 border-t-transparent animate-spin rounded-full" /></div>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <Button type="submit" variant="primary" isLoading={submittingVerification}>
+                    Submit Application for Audit
+                  </Button>
+                </div>
+              </form>
             )}
           </div>
         )}
 
-        {/* Tab: Settings */}
-        {activeTab === "settings" && (
-          <>
-            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Notifications</div>
-              {[
-                { label: "Ride Alerts", desc: "Get notified when a ride matches your route", on: true },
-                { label: "Booking Updates", desc: "Confirmations and cancellation alerts", on: true },
-                { label: "Promotions", desc: "Deals and offers from Ridivo", on: false },
-                { label: "Review Reminders", desc: "Reminders to review past rides", on: true },
-              ].map((s, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i < 3 ? `1px solid ${theme.border}` : "none" }}>
-                  <div>
-                    <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "600" }}>{s.label}</div>
-                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{s.desc}</div>
-                  </div>
-                  <div style={{ width: "40px", height: "22px", backgroundColor: s.on ? theme.success : theme.border, borderRadius: "11px", position: "relative", cursor: "pointer", transition: "all 0.2s" }}>
-                    <div style={{ width: "16px", height: "16px", backgroundColor: "#fff", borderRadius: "50%", position: "absolute", top: "3px", right: s.on ? "3px" : "auto", left: s.on ? "auto" : "3px", transition: "all 0.2s" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* 5. SECURITY SETTINGS TAB */}
+        {activeTab === "security" && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Security Credentials</h3>
+            
+            <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+              <Input
+                label="Current Password"
+                type="password"
+                required
+                placeholder="Enter current password"
+                value={passwordForm.oldPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
+              />
+              <Input
+                label="New Password"
+                type="password"
+                required
+                placeholder="Minimum 6 characters"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+              />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                required
+                placeholder="Re-enter new password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              />
 
-            <div style={{ backgroundColor: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: "16px", padding: "24px", marginBottom: "20px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.textPrimary, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "20px" }}>Privacy</div>
-              {[
-                { label: "Show Phone Number", desc: "Visible to co-passengers after booking", on: false },
-                { label: "Public Profile", desc: "Anyone can view your profile and reviews", on: true },
-              ].map((s, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i < 1 ? `1px solid ${theme.border}` : "none" }}>
-                  <div>
-                    <div style={{ fontSize: "14px", color: theme.textPrimary, fontWeight: "600" }}>{s.label}</div>
-                    <div style={{ fontSize: "12px", color: theme.textSecondary, marginTop: "2px" }}>{s.desc}</div>
-                  </div>
-                  <div style={{ width: "40px", height: "22px", backgroundColor: s.on ? theme.success : theme.border, borderRadius: "11px", position: "relative", cursor: "pointer", transition: "all 0.2s" }}>
-                    <div style={{ width: "16px", height: "16px", backgroundColor: "#fff", borderRadius: "50%", position: "absolute", top: "3px", right: s.on ? "3px" : "auto", left: s.on ? "auto" : "3px", transition: "all 0.2s" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ backgroundColor: theme.dangerBg, border: `1px solid rgba(239, 68, 68, 0.15)`, borderRadius: "16px", padding: "24px" }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "14px", fontWeight: "700", color: theme.danger, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "12px" }}>⚠️ Danger Zone</div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <button style={{ padding: "10px 16px", background: "none", color: theme.danger, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.05)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>Deactivate Account</button>
-                <button style={{ padding: "10px 16px", background: "none", color: theme.danger, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.05)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>Delete Account</button>
+              <div className="pt-2">
+                <Button type="submit" variant="primary" isLoading={changingPasswordState}>
+                  Change Account Password
+                </Button>
               </div>
-            </div>
-          </>
+            </form>
+          </div>
         )}
+
       </div>
 
-      {editOpen && <EditModal user={user} onClose={() => setEditOpen(false)} onSave={handleSave} />}
-
-      {formOpen && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(9, 60, 93, 0.4)", zIndex: 1000,
-          display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)"
-        }}>
-          <div style={{
-            background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 32,
-            width: "100%", maxWidth: 420, boxShadow: "0 25px 60px rgba(9, 60, 93, 0.1)",
-            fontFamily: "'DM Sans', sans-serif"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h3 style={{ color: theme.textPrimary, fontSize: 18, fontWeight: 700, margin: 0, fontFamily: "'Sora', sans-serif" }}>
-                {editingContact ? "Edit Contact" : "Add Emergency Contact"}
-              </h3>
-              <button onClick={() => setFormOpen(false)} style={{ background: "none", border: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 20 }}>✕</button>
+      {/* ── PROFILE DETAILS EDIT MODAL ── */}
+      {editProfileOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-md w-full p-6 space-y-4 shadow-2xl animate-fade-in-up">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">Edit Profile Information</h3>
+              <button onClick={() => setEditProfileOpen(false)} className="text-slate-400 text-lg hover:text-slate-600">✕</button>
             </div>
-
-            {formError && (
-              <div style={{
-                backgroundColor: theme.dangerBg, color: theme.danger, border: `1px solid rgba(239, 68, 68, 0.15)`,
-                padding: "10px 14px", borderRadius: 8, fontSize: "12.5px", fontWeight: "600", marginBottom: 16
-              }}>
-                ⚠️ {formError}
+            
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <Input
+                label="Full Name"
+                required
+                value={profileForm.name}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+              />
+              <Input
+                label="Phone Number"
+                placeholder="+91 XXXXX XXXXX"
+                value={profileForm.phone}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+              />
+              
+              <div className="pt-4 flex gap-3">
+                <Button variant="secondary" className="flex-1" onClick={() => setEditProfileOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" className="flex-1" isLoading={savingProfile}>
+                  Save Details
+                </Button>
               </div>
-            )}
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Full Name</label>
-              <input
-                value={contactForm.name}
-                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                placeholder="e.g. John Doe"
-                style={{
-                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
-                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Relationship</label>
-              <select
-                value={contactForm.relationship}
-                onChange={(e) => setContactForm({ ...contactForm, relationship: e.target.value })}
-                style={{
-                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
-                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
-                  boxSizing: "border-box", cursor: "pointer"
-                }}
-              >
-                {["Parent", "Spouse", "Sibling", "Child", "Friend", "Other"].map((rel) => (
-                  <option key={rel} value={rel}>{rel}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", color: theme.textSecondary, fontSize: 12, marginBottom: 6, fontWeight: "600" }}>Phone Number</label>
-              <input
-                value={contactForm.phone}
-                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                placeholder="e.g. +919876543210"
-                style={{
-                  width: "100%", background: "#F9FAFB", border: `1px solid ${theme.border}`, borderRadius: 8,
-                  color: theme.textPrimary, padding: "10px 14px", fontSize: 14, outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-              <button onClick={() => setFormOpen(false)} style={{
-                flex: 1, padding: "12px 0", borderRadius: 8, border: `1px solid ${theme.border}`,
-                background: "none", color: theme.textSecondary, cursor: "pointer", fontSize: 14, fontWeight: "600"
-              }}>Cancel</button>
-              <button onClick={handleSaveContact} disabled={formSaving} style={{
-                flex: 1, padding: "12px 0", borderRadius: 8, border: "none",
-                background: formSaving ? theme.accent : theme.textPrimary, color: "#fff",
-                cursor: formSaving ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600
-              }}>
-                {formSaving ? "Saving..." : "Save Contact"}
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
-    </>
+
+      {/* ── VEHICLE ADD/EDIT MODAL ── */}
+      {vehicleFormOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-md w-full p-6 space-y-4 shadow-2xl animate-fade-in-up">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">{editingVehicle ? 'Modify Vehicle Records' : 'Register New Vehicle'}</h3>
+              <button onClick={() => setVehicleFormOpen(false)} className="text-slate-400 text-lg hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleVehicleSubmit} className="space-y-4">
+              <Input
+                label="Vehicle Model/Name"
+                placeholder="e.g. Maruti Suzuki Swift"
+                required
+                value={vehicleForm.vehicle_name}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicle_name: e.target.value }))}
+              />
+              <Input
+                label="Registration Plate Number"
+                placeholder="e.g. MP09AB1234"
+                required
+                value={vehicleForm.vehicle_number}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicle_number: e.target.value.toUpperCase() }))}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Vehicle Type</label>
+                  <select
+                    value={vehicleForm.vehicle_type}
+                    onChange={(e) => setVehicleForm(prev => ({ ...prev, vehicle_type: e.target.value }))}
+                    className="block w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  >
+                    <option value="CAR">Car</option>
+                    <option value="SUV">SUV</option>
+                    <option value="BIKE">Motorcycle</option>
+                  </select>
+                </div>
+
+                <Input
+                  label="Seats Capacity"
+                  type="number"
+                  min={1}
+                  max={7}
+                  required
+                  value={vehicleForm.total_seats}
+                  onChange={(e) => setVehicleForm(prev => ({ ...prev, total_seats: e.target.value }))}
+                />
+              </div>
+
+              <Input
+                label="Vehicle Color"
+                placeholder="e.g. White"
+                value={vehicleForm.color || ''}
+                onChange={(e) => setVehicleForm(prev => ({ ...prev, color: e.target.value }))}
+              />
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Vehicle Photo</label>
+                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center hover:border-primary-500 transition-colors relative">
+                  {vehicleForm.vehicle_image_url ? (
+                    <div className="space-y-2">
+                      <img src={vehicleForm.vehicle_image_url} alt="Vehicle preview" className="h-28 mx-auto rounded-lg object-cover" />
+                      <p className="text-[10px] text-slate-500">Photo added.</p>
+                    </div>
+                  ) : (
+                    <div className="py-3">
+                      <Upload className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-xs text-slate-500 mt-2 font-medium">Select file or drag picture here</p>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleFileUpload(e, 'vehicle')} />
+                  {uploadingDoc === 'vehicle' && <div className="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center"><div className="w-5 h-5 border-2 border-primary-600 border-t-transparent animate-spin rounded-full" /></div>}
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button variant="secondary" className="flex-1" onClick={() => setVehicleFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" className="flex-1" isLoading={savingVehicle}>
+                  {editingVehicle ? 'Update Records' : 'Register Vehicle'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── EMERGENCY CONTACT ADD/EDIT MODAL ── */}
+      {contactFormOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-md w-full p-6 space-y-4 shadow-2xl animate-fade-in-up">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800">{editingContact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}</h3>
+              <button onClick={() => setContactFormOpen(false)} className="text-slate-400 text-lg hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleContactSubmit} className="space-y-4">
+              <Input
+                label="Full Name"
+                placeholder="Enter contact full name"
+                required
+                value={contactForm.name}
+                onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
+              />
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Relationship</label>
+                <select
+                  value={contactForm.relationship}
+                  onChange={(e) => setContactForm(prev => ({ ...prev, relationship: e.target.value }))}
+                  className="block w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                >
+                  <option value="Parent">Parent</option>
+                  <option value="Spouse">Spouse</option>
+                  <option value="Sibling">Sibling</option>
+                  <option value="Friend">Friend</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <Input
+                label="Phone Number"
+                placeholder="e.g. +919876543210"
+                required
+                value={contactForm.phone}
+                onChange={(e) => setContactForm(prev => ({ ...prev, phone: e.target.value }))}
+              />
+
+              <div className="pt-4 flex gap-3">
+                <Button variant="secondary" className="flex-1" onClick={() => setContactFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" className="flex-1" isLoading={savingContact}>
+                  {editingContact ? 'Save Changes' : 'Add Contact'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }

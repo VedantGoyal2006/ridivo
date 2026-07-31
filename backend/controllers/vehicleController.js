@@ -3,7 +3,8 @@ import {
     getVehiclesByDriverId,
     getVehicleById,
     setActiveVehicle,
-    deleteVehicle
+    deleteVehicle,
+    updateVehicle
 } from '../models/vehicleModel.js';
 import { getVerificationByUserId } from '../models/verificationModel.js';
 
@@ -111,6 +112,48 @@ export const removeVehicle = async (req, res) => {
 
     } catch (err) {
         console.error('Remove vehicle error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// PUT /api/vehicles/:id
+export const editVehicle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { vehicle_name, vehicle_number, vehicle_type, total_seats, color, vehicle_image_url } = req.body;
+
+        if (!vehicle_name || !vehicle_number || !vehicle_type || !total_seats) {
+            return res.status(400).json({ 
+                message: 'Vehicle name, number, type and seats are required' 
+            });
+        }
+
+        const vehicle = await getVehicleById(id);
+        if (!vehicle) {
+            return res.status(404).json({ message: 'Vehicle not found' });
+        }
+        if (vehicle.driver_id !== req.user.id) {
+            return res.status(403).json({ message: 'Not your vehicle' });
+        }
+
+        const updated = await updateVehicle(
+            id,
+            req.user.id,
+            vehicle_name,
+            vehicle_number,
+            vehicle_type,
+            total_seats,
+            color,
+            vehicle_image_url
+        );
+
+        return res.status(200).json({
+            message: 'Vehicle details updated successfully',
+            vehicle: updated
+        });
+
+    } catch (err) {
+        console.error('Edit vehicle error:', err.message);
         return res.status(500).json({ message: 'Server error' });
     }
 };

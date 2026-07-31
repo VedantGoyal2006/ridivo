@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { generateSecureOTP, decryptOTP } from '../utils/otpHelper.js';
 
 // Create a booking with race condition protection
 export const createBooking = async (ride_id, traveler_id, seats_booked, pickup_point, drop_point) => {
@@ -53,7 +54,7 @@ export const createBooking = async (ride_id, traveler_id, seats_booked, pickup_p
 export const getBookingsByTraveler = async (traveler_id) => {
     const result = await pool.query(
         `SELECT b.id, b.ride_id, b.traveler_id, b.seats_booked, b.pickup_point, b.drop_point, b.total_fare,
-                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at,
+                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at, b.otp_hash, b.otp_expires_at,
                 CASE 
                     WHEN r.status = 'COMPLETED' THEN 'COMPLETED'
                     WHEN r.status = 'CANCELLED' THEN 'CANCELLED'
@@ -71,7 +72,12 @@ export const getBookingsByTraveler = async (traveler_id) => {
         [traveler_id]
     );
 
-    return result.rows;
+    return result.rows.map(row => {
+        if (row.otp_hash) {
+            row.otp_code = decryptOTP(row.otp_hash);
+        }
+        return row;
+    });
 };
 
 // Get all bookings for a ride (driver view)
@@ -87,14 +93,19 @@ export const getBookingsByRide = async (ride_id) => {
         [ride_id]
     );
 
-    return result.rows;
+    return result.rows.map(row => {
+        if (row.otp_hash) {
+            row.otp_code = decryptOTP(row.otp_hash);
+        }
+        return row;
+    });
 };
 
 // Get single booking by ID
 export const getBookingById = async (booking_id) => {
     const result = await pool.query(
         `SELECT b.id, b.ride_id, b.traveler_id, b.seats_booked, b.pickup_point, b.drop_point, b.total_fare,
-                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at,
+                b.cancelled_by, b.cancellation_reason, b.created_at, b.updated_at, b.otp_hash, b.otp_expires_at,
                 CASE 
                     WHEN r.status = 'COMPLETED' THEN 'COMPLETED'
                     WHEN r.status = 'CANCELLED' THEN 'CANCELLED'
@@ -113,7 +124,11 @@ export const getBookingById = async (booking_id) => {
         return null;
     }
 
-    return result.rows[0];
+    const row = result.rows[0];
+    if (row.otp_hash) {
+        row.otp_code = decryptOTP(row.otp_hash);
+    }
+    return row;
 };
 
 // Accept a booking (driver action)
@@ -148,13 +163,19 @@ export const acceptBooking = async (booking_id) => {
             throw new Error('Not enough seats available anymore');
         }
 
+        // Generate Boarding OTP
+        const otpData = await generateSecureOTP();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour validity
+
         // Confirm the booking
         await client.query(
             `UPDATE bookings SET 
                 status = 'CONFIRMED',
+                otp_hash = $1,
+                otp_expires_at = $2,
                 updated_at = NOW()
-             WHERE id = $1`,
-            [booking_id]
+             WHERE id = $3`,
+            [otpData.encrypted, expiresAt, booking_id]
         );
 
         // Decrease available seats in ride
@@ -177,7 +198,11 @@ export const acceptBooking = async (booking_id) => {
             [booking_id]
         );
 
-        return updated.rows[0];
+        const row = updated.rows[0];
+        if (row.otp_hash) {
+            row.otp_code = decryptOTP(row.otp_hash);
+        }
+        return row;
 
     } catch (err) {
         await client.query('ROLLBACK');
@@ -220,7 +245,7 @@ export const cancelBooking = async (booking_id, cancelled_by, cancellation_reaso
 
         const booking = bookingResult.rows[0];
 
-        if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
+        if (!['PENDING', 'CONFIRMED', 'RESERVED', 'PAID'].includes(booking.status)) {
             throw new Error('This booking cannot be cancelled');
         }
 
@@ -235,8 +260,8 @@ export const cancelBooking = async (booking_id, cancelled_by, cancellation_reaso
             [cancelled_by, cancellation_reason, booking_id]
         );
 
-        // Only restore seats if booking was CONFIRMED
-        if (booking.status === 'CONFIRMED') {
+        // Restore seats if booking was accepted (CONFIRMED, RESERVED, PAID)
+        if (['CONFIRMED', 'RESERVED', 'PAID'].includes(booking.status)) {
             const rideResult = await client.query(
                 `SELECT available_seats FROM rides 
                  WHERE id = $1 FOR UPDATE`,

@@ -397,7 +397,11 @@ function RecentActivity({ bookings = [], rides = [] }) {
 }
 
 // ── RIGHT PANEL ───────────────────────────────────────────────────────────────
-function RightPanel({ user, navigate }) {
+function RightPanel({ user, navigate, stats }) {
+  const ridesCount = user?.total_rides || stats?.ridesTaken || 0;
+  const offeredCount = stats?.ridesOffered || 0;
+  const ratingStr = user?.avg_rating ? `${parseFloat(user.avg_rating).toFixed(1)}★` : "5.0★";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* Profile summary card */}
@@ -421,7 +425,11 @@ function RightPanel({ user, navigate }) {
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", position: "relative" }}>
-          {[["12", "Rides"], ["3", "Offered"], ["4.8★", "Rating"]].map(([val, label]) => (
+          {[
+            { val: ridesCount, label: "Rides" },
+            { val: offeredCount, label: "Offered" },
+            { val: ratingStr, label: "Rating" }
+          ].map(({ val, label }) => (
             <div key={label} style={{ textAlign: "center", backgroundColor: "rgba(255,255,255,0.1)", borderRadius: "12px", padding: "10px 8px" }}>
               <div style={{ fontFamily: "'Sora', sans-serif", fontSize: "18px", fontWeight: "800", color: "#FFFFFF" }}>{val}</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: "10px", color: "rgba(255,255,255,0.7)" }}>{label}</div>
@@ -565,8 +573,8 @@ export default function Dashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "20px", marginBottom: "28px" }}>
           <StatCard icon={Luggage} label="Rides Taken" value={stats.ridesTaken} sub="Total bookings" color={theme.accentDark} bg={theme.accentLight} />
           <StatCard icon={Car} label="Rides Offered" value={stats.ridesOffered} sub="Total rides posted" color={theme.success} bg={theme.successBg} />
-          <StatCard icon={Coins} label="Total Saved" value="₹2,450" sub="vs solo travel" color={theme.warningText} bg={theme.warningBg} />
-          <StatCard icon={Star} label="Avg Rating" value="4.8" sub="From 12 reviews" color="#7C3AED" bg="rgba(167, 139, 250, 0.08)" />
+          <StatCard icon={Coins} label="Total Saved" value={`₹${((stats.ridesTaken * 450) + (stats.ridesOffered * 800)).toLocaleString('en-IN')}`} sub="vs solo travel" color={theme.warningText} bg={theme.warningBg} />
+          <StatCard icon={Star} label="Avg Rating" value={user?.avg_rating ? parseFloat(user.avg_rating).toFixed(1) : "5.0"} sub={user?.total_rides ? `From ${user.total_rides} reviews` : "From 0 reviews"} color="#7C3AED" bg="rgba(167, 139, 250, 0.08)" />
         </div>
 
         {/* Search */}
@@ -578,7 +586,7 @@ export default function Dashboard() {
             <UpcomingRides bookings={myBookings} onSOS={handleSOS} />
             <RecentActivity bookings={myBookings} rides={myRides} />
           </div>
-          <RightPanel user={user} navigate={navigate} />
+          <RightPanel user={user} navigate={navigate} stats={stats} />
         </div>
       </div>
 

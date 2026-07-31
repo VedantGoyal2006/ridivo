@@ -8,7 +8,9 @@ import {
     acceptBooking,
     rejectBooking,
     cancelBooking,
-    triggerSOS
+    triggerSOS,
+    verifyBookingOTP,
+    getPublicSOSDetails
 } from '../controllers/bookingController.js';
 
 const router = express.Router();
@@ -21,5 +23,9 @@ router.put('/:id/accept', protect, acceptBooking);
 router.put('/:id/reject', protect, rejectBooking);
 router.put('/:id/cancel', protect, cancelBooking);
 router.post('/:id/sos', protect, triggerSOS);
+router.post('/:id/verify-otp', protect, verifyBookingOTP);
+
+// Public route for emergency contacts tracking (no auth required!)
+router.get('/:id/sos/public-details', getPublicSOSDetails);
 
 export default router;

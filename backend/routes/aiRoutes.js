@@ -1,9 +1,20 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
-import { suggestPrice } from '../controllers/aiController.js';
+import { 
+    suggestPrice, 
+    getRecommendations, 
+    checkReviewContent, 
+    getDemandAnalytics 
+} from '../controllers/aiController.js';
 
 const router = express.Router();
 
-router.post('/suggest-price', protect, suggestPrice);
+// Apply auth protections
+router.use(protect);
+
+router.post('/suggest-price', suggestPrice);
+router.get('/recommendations', getRecommendations);
+router.post('/check-review', checkReviewContent);
+router.get('/demand-analytics', getDemandAnalytics);
 
 export default router;

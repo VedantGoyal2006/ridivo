@@ -1,7 +1,6 @@
 export const protect = (req, res, next) => {
-    // Passport session attaches user to req and adds req.isAuthenticated() helper
     if (req.isAuthenticated() && req.user) {
-        // Check if account is active
+        //This method is provided by Passport.js.It checks whether Passport has successfully authenticated the current request.
         if (!req.user.is_active) {
             return res.status(403).json({ 
                 message: 'Your account has been deactivated' 

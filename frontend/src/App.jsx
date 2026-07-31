@@ -16,6 +16,7 @@ import VerificationPage from './pages/VerificationPage'
 import AdminPage from './pages/AdminPage'
 import RidesPage from './pages/RidesPage'
 import BookingsPage from './pages/BookingsPage'
+import PublicSOSTrackingPage from './pages/PublicSOSTrackingPage'
 
 function AuthSuccess() {
   const navigate = useNavigate();
@@ -49,7 +50,35 @@ function AuthSuccess() {
 function App() {
   return (
     <BrowserRouter>
-      <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+      <Toaster 
+        position="top-right" 
+        toastOptions={{ 
+          duration: 4000,
+          style: {
+            fontFamily: "'Outfit', 'DM Sans', sans-serif",
+            background: '#ffffff',
+            color: '#0f172a',
+            border: '1px solid #e2e8f0',
+            borderRadius: '14px',
+            boxShadow: '0 10px 30px -10px rgba(9, 60, 93, 0.12)',
+            padding: '12px 18px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          success: {
+            iconTheme: {
+              primary: '#0D8AD8',
+              secondary: '#ffffff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#ffffff',
+            },
+          },
+        }} 
+      />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
@@ -57,6 +86,7 @@ function App() {
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/auth/success" element={<AuthSuccess />} />
+        <Route path="/track-sos/:bookingId" element={<PublicSOSTrackingPage />} />
 
         {/* Protected routes wrapped in DashboardLayout */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
