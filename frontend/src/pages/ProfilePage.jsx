@@ -364,6 +364,20 @@ export default function ProfilePage() {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 text-center space-y-4">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
+        <h2 className="text-xl font-bold">Unable to load profile</h2>
+        <p className="text-slate-500">We couldn't retrieve your profile details. Please make sure you are logged in.</p>
+        <div className="flex justify-center gap-4">
+          <Button onClick={() => loadProfileData()}>Retry</Button>
+          <Button variant="secondary" onClick={() => navigate("/login")}>Go to Login</Button>
+        </div>
+      </div>
+    );
+  }
+
   const memberSinceStr = user
     ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
     : "";
