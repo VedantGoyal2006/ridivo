@@ -28,7 +28,7 @@ export default function PublicSOSTrackingPage() {
       try {
         setLoading(true);
         // Call public endpoint
-        const res = await axios.get(`http://localhost:5000/api/bookings/${bookingId}/sos/public-details`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/bookings/${bookingId}/sos/public-details`);
         const data = res.data.details;
         setDetails(data);
 

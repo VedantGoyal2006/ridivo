@@ -139,8 +139,8 @@ export default function DashboardLayout() {
     };
     fetchNotifications();
 
-    // Establish Socket connection
-    const socket = io("http://localhost:5000", {
+    const socketUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || "http://localhost:5000";
+    const socket = io(socketUrl, {
       withCredentials: true,
       transports: ["websocket", "polling"],
     });
